@@ -195,11 +195,11 @@ def mcp_info():
     """Public info endpoint — shows how to connect."""
     return jsonify(
         {
-            "name": "Morgenruf MCP Server",
+            "name": "晨序 MCP Server",
             "version": "1.0.0",
             "transport": "http",
             "endpoint": request.host_url.rstrip("/") + "/mcp",
-            "auth": "Bearer token — generate from your Morgenruf dashboard",
+            "auth": "Bearer token — generate from your 晨序 dashboard",
             "docs": "https://docs.morgenruf.dev/mcp.html",
             "tools": [t["name"] for t in TOOLS],
         }
@@ -216,7 +216,7 @@ def mcp_endpoint():
                 "jsonrpc": "2.0",
                 "error": {
                     "code": -32001,
-                    "message": "Unauthorized — provide a valid Bearer API key from your Morgenruf dashboard",
+                    "message": "Unauthorized — provide a valid Bearer API key from your 晨序 dashboard",
                 },
                 "id": None,
             }

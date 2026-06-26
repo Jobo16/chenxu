@@ -1,6 +1,6 @@
-# Contributing to Morgenruf
+# Contributing to 晨序
 
-Morgenruf is open source and all contributions are welcome — whether that's a bug report, a feature request, documentation improvement, or a pull request. Thank you for taking the time to contribute!
+晨序 is open source and all contributions are welcome — whether that's a bug report, a feature request, documentation improvement, or a pull request. Thank you for taking the time to contribute!
 
 ## Development setup
 
@@ -88,4 +88,4 @@ Have a question or idea? Start a thread in [GitHub Discussions](https://github.c
 
 ## License
 
-By contributing to Morgenruf, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
+By contributing to 晨序, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).

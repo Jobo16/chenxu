@@ -1,16 +1,17 @@
 """AI-powered standup summary generator.
 
-Uses OpenAI (gpt-4o-mini) or Anthropic (claude-haiku) to generate
+Uses OpenAI (gpt-4o-mini), DeepSeek, or Anthropic (claude-haiku) to generate
 a concise paragraph summarising the team's standup responses.
 
-Requires: OPENAI_API_KEY or ANTHROPIC_API_KEY env var.
+Requires provider API keys from Dashboard settings or env.
 Falls back to a plain bullet-point summary if no key is set.
 """
 
 from __future__ import annotations
 
 import logging
-import os
+
+from app_settings import get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +23,13 @@ _SYSTEM_PROMPT = """You are a team standup summariser. Given a list of standup u
 Be concise, professional, and use "the team" language. Do not list every person individually."""
 
 
-def generate_summary(standups: list[dict], team_name: str = "") -> str:
+def generate_summary(standups: list[dict], team_name: str = "", provider: str | None = None) -> str:
     """Generate an AI summary paragraph from standup data.
 
     Falls back to plain list summary if no API key configured.
     """
     if not standups:
         return ""
-
-    openai_key = os.environ.get("OPENAI_API_KEY", "")
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
     # Build the standup text
     lines = []
@@ -45,8 +43,22 @@ def generate_summary(standups: list[dict], team_name: str = "") -> str:
         )
     standup_text = "\n\n".join(lines)
 
+    provider = (provider or "").strip().lower()
+    openai_key = get_setting("OPENAI_API_KEY")
+    anthropic_key = get_setting("ANTHROPIC_API_KEY")
+    deepseek_key = get_setting("DEEPSEEK_API_KEY")
+
+    if provider == "openai":
+        return _openai_summary(standup_text, team_name, openai_key) if openai_key else ""
+    if provider == "anthropic":
+        return _anthropic_summary(standup_text, team_name, anthropic_key) if anthropic_key else ""
+    if provider == "deepseek":
+        return _deepseek_summary(standup_text, team_name, deepseek_key) if deepseek_key else ""
+
     if openai_key:
         return _openai_summary(standup_text, team_name, openai_key)
+    if deepseek_key:
+        return _deepseek_summary(standup_text, team_name, deepseek_key)
     if anthropic_key:
         return _anthropic_summary(standup_text, team_name, anthropic_key)
 
@@ -55,14 +67,44 @@ def generate_summary(standups: list[dict], team_name: str = "") -> str:
 
 
 def _openai_summary(text: str, team_name: str, api_key: str) -> str:
+    return _openai_compatible_summary(
+        text=text,
+        team_name=team_name,
+        api_key=api_key,
+        base_url="https://api.openai.com",
+        model="gpt-4o-mini",
+        provider_name="OpenAI",
+    )
+
+
+def _deepseek_summary(text: str, team_name: str, api_key: str) -> str:
+    return _openai_compatible_summary(
+        text=text,
+        team_name=team_name,
+        api_key=api_key,
+        base_url=get_setting("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        model=get_setting("DEEPSEEK_MODEL", "deepseek-chat"),
+        provider_name="DeepSeek",
+    )
+
+
+def _openai_compatible_summary(
+    *,
+    text: str,
+    team_name: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    provider_name: str,
+) -> str:
     try:
         import httpx
 
         response = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
+            _chat_completions_url(base_url),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "gpt-4o-mini",
+                "model": model,
                 "messages": [
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {"role": "user", "content": f"Team: {team_name}\n\nStandups:\n{text}"},
@@ -75,8 +117,17 @@ def _openai_summary(text: str, team_name: str, api_key: str) -> str:
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as exc:
-        logger.warning("OpenAI summary failed: %s", exc)
+        logger.warning("%s summary failed: %s", provider_name, exc)
         return ""
+
+
+def _chat_completions_url(base_url: str) -> str:
+    base = (base_url or "https://api.deepseek.com").rstrip("/")
+    if base.endswith("/chat/completions"):
+        return base
+    if base.endswith("/v1"):
+        return f"{base}/chat/completions"
+    return f"{base}/v1/chat/completions"
 
 
 def _anthropic_summary(text: str, team_name: str, api_key: str) -> str:

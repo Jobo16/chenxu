@@ -1,6 +1,6 @@
-# Morgenruf 🌅
+# 晨序
 
-> **German:** *Morgenruf* — "morning call" · Built over a weekend at a Tim Hortons in Toronto 🇨🇦☕
+> 让每日进展收集、站会汇总和 AI 总结形成稳定节奏。
 
 [![Release](https://img.shields.io/github/v/release/morgenruf/morgenruf?label=latest&color=brightgreen)](https://github.com/morgenruf/morgenruf/releases)
 [![Tests](https://github.com/morgenruf/morgenruf/actions/workflows/test.yml/badge.svg)](https://github.com/morgenruf/morgenruf/actions/workflows/test.yml)
@@ -8,7 +8,7 @@
 [![codecov](https://codecov.io/gh/morgenruf/morgenruf/branch/main/graph/badge.svg)](https://codecov.io/gh/morgenruf/morgenruf)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A self-hosted, open-source Slack standup bot. Ask structured daily questions, post formatted summaries to team channels, and keep full ownership of your standup data — no SaaS subscription required.
+A self-hosted standup bot for Feishu/Lark and Slack. Ask structured daily questions, post formatted summaries to team channels, and keep full ownership of your standup data.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Status](https://img.shields.io/badge/status-operational-brightgreen)](https://status.morgenruf.dev)
@@ -105,7 +105,7 @@ If you fork this repo, add the following secrets under **Settings → Secrets an
 
 ## Docker / Mac Quickstart
 
-The fastest way to run Morgenruf locally or on a Mac server.
+The fastest way to run 晨序 locally or on a Mac server.
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Mac/Linux/Windows)
@@ -170,9 +170,80 @@ docker compose up -d --restart-policy always
 
 ---
 
+## 飞书内部机器人
+
+晨序可以不接 Slack，直接作为公司内部飞书机器人使用。
+
+创建飞书自建应用，启用机器人，订阅消息接收事件，并把事件接收方式切到“长连接”。
+
+首次启动只需要保留数据库和会话密钥。飞书、AI、默认群聊、成员、调度等配置都可以在 Dashboard 的「设置」页修改。长连接模式不需要公网事件回调地址，本地开发可以直接连飞书。
+
+```bash
+APP_URL=https://your-domain.com
+DASHBOARD_AUTH=none
+
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
+FEISHU_EVENT_MODE=ws
+FEISHU_TEAM_ID=feishu
+FEISHU_TEAM_NAME="你的公司"
+FEISHU_DEFAULT_CHAT_ID=oc_xxx
+FEISHU_DEFAULT_CHAT_NAME="研发站会"
+FEISHU_CHANNELS="oc_xxx|研发群,oc_yyy|产品群"
+FEISHU_STANDUP_MEMBERS="ou_xxx|张三|zhangsan@example.com,ou_yyy|李四|lisi@example.com"
+FEISHU_SCHEDULE_TIME=09:30
+FEISHU_SCHEDULE_TZ=Asia/Shanghai
+FEISHU_SCHEDULE_DAYS=mon,tue,wed,thu,fri
+FEISHU_AI_SUMMARY_ENABLED=true
+FEISHU_AI_PROVIDER=deepseek
+OPENAI_API_KEY=sk-...
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+如果需要给 Dashboard 加一道简单访问密钥：
+
+```bash
+DASHBOARD_AUTH=key
+DASHBOARD_ADMIN_KEY=generate-a-long-random-secret
+```
+
+所需飞书能力：
+
+- 启用机器人能力
+- 订阅消息事件：`im.message.receive_v1`
+- 机器人发送消息：`im:message`
+- 可选成员信息同步：通讯录用户读取权限
+
+长连接模式下不需要配置事件回调地址，也不需要 `Verification Token` / `Encrypt Key`。如果切回公网回调模式，再把 `FEISHU_EVENT_MODE` 改成 `webhook`，并配置：
+
+```text
+https://your-domain.com/feishu/events
+```
+
+首次启动前执行数据库迁移：
+
+```bash
+cd app
+docker compose up -d db
+docker compose run --rm app python src/migrate.py
+docker compose up -d app
+```
+
+成员可以回复 `站会` 手动开始，回复 `跳过` 跳过当天，或直接回答定时私聊问题。开启 AI 汇总后，系统会先发送成员明细，再把 AI 总结发到同一个飞书群。AI Key 支持在 Dashboard 设置页配置 `OPENAI_API_KEY`、`DEEPSEEK_API_KEY` 或 `ANTHROPIC_API_KEY`；DeepSeek 使用 OpenAI-compatible 调用格式，默认 Base URL 为 `https://api.deepseek.com`。
+
+打开 Dashboard：
+
+```text
+http://localhost:3000/dashboard
+```
+
+Dashboard 支持配置飞书长连接、AI Key、控制台访问方式、默认群聊、成员列表，也支持创建/编辑站会调度、选择工作日、跳过周末、设置提醒、选择参与人、开启 AI 汇总、查看和导出历史汇总。
+
 ## Google Chat (Beta)
 
-Morgenruf supports Google Chat via the Chat REST API and a service account.
+晨序 supports Google Chat via the Chat REST API and a service account.
 
 > **Note:** Google Chat bot integration requires **Google Workspace** (not free Gmail accounts).
 
@@ -189,7 +260,7 @@ Morgenruf supports Google Chat via the Chat REST API and a service account.
 6. **Configure the bot in Google Chat Admin** — _admin.google.com → Apps → Google Chat → Manage bots_
    - Set the **Webhook URL** to: `https://your-domain.com/google/events`
    - Enable _Direct messages_ and _Space messages_
-7. **Restart Morgenruf** — the Google Chat blueprint is registered automatically when `GOOGLE_CREDENTIALS` is set.
+7. **Restart 晨序** — the Google Chat blueprint is registered automatically when `GOOGLE_CREDENTIALS` is set.
 
 ### Commands (in Google Chat DM or Space)
 
@@ -259,7 +330,7 @@ Then posts a formatted summary to the configured channel:
 
 ## Kubernetes Deployment
 
-Morgenruf ships a production-ready Helm chart at `app/helm/morgenruf/`.
+晨序 ships a production-ready Helm chart at `app/helm/morgenruf/`.
 
 ### Database (recommended: external PostgreSQL)
 
@@ -401,5 +472,3 @@ app/helm/morgenruf/
 PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ---
-
-

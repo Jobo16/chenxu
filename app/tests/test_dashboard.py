@@ -43,6 +43,14 @@ else:
     sys.modules.pop("oauth", None)
 
 
+@pytest.fixture(autouse=True)
+def dashboard_auth_key_mode(monkeypatch):
+    monkeypatch.setenv("DASHBOARD_AUTH", "key")
+    monkeypatch.delenv("DASHBOARD_ADMIN_KEY", raising=False)
+    _db_mock.get_app_settings.return_value = {}
+    _db_mock.get_installation.return_value = None
+
+
 @pytest.fixture()
 def app():
     flask_app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "../src/templates"))
@@ -90,9 +98,49 @@ class TestAuthGuard:
         resp = client.get("/dashboard")
         assert resp.status_code in (301, 302)
 
+    def test_internal_auth_mode_auto_logs_in(self, client, monkeypatch):
+        monkeypatch.setenv("DASHBOARD_AUTH", "none")
+        _db_mock.get_standup_schedules.return_value = []
+
+        resp = client.get("/dashboard/api/standups")
+
+        assert resp.status_code == 200
+        with client.session_transaction() as sess:
+            assert sess["team_id"] == "feishu"
+            assert sess["user_id"] == "admin"
+
     def test_logout_clears_session_and_redirects(self, authed_client):
         resp = authed_client.get("/dashboard/logout")
         assert resp.status_code in (301, 302)
+
+    def test_feishu_admin_key_login_sets_session(self, client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        monkeypatch.setenv("FEISHU_DASHBOARD_ADMIN_KEY", "admin-key")
+        monkeypatch.setenv("FEISHU_ADMIN_OPEN_ID", "ou_admin")
+        _db_mock.get_installation.return_value = {"team_name": "Feishu Team"}
+
+        resp = client.get("/dashboard/login?key=admin-key")
+
+        assert resp.status_code in (301, 302)
+        with client.session_transaction() as sess:
+            assert sess["team_id"] == "feishu"
+            assert sess["user_id"] == "ou_admin"
+        _db_mock.ensure_admin.assert_called()
+
+    def test_settings_update_persists_allowed_keys(self, authed_client):
+        longconn_mod = MagicMock()
+        with patch.dict(sys.modules, {"feishu_longconn": longconn_mod}):
+            resp = authed_client.put(
+                "/dashboard/api/settings",
+                json={"settings": {"APP_URL": "http://localhost:3000", "FEISHU_TEAM_NAME": "研发部", "FEISHU_EVENT_MODE": "ws", "UNKNOWN": "x"}},
+            )
+
+        assert resp.status_code == 200
+        _db_mock.set_app_settings.assert_called()
+        saved = _db_mock.set_app_settings.call_args.args[0]
+        assert saved == {"APP_URL": "http://localhost:3000", "FEISHU_TEAM_NAME": "研发部", "FEISHU_EVENT_MODE": "ws"}
+        longconn_mod.feishu_longconn_service.stop.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +196,105 @@ class TestApiMembers:
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, list)
+
+    def test_feishu_returns_db_members(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_active_members.return_value = [
+            {"user_id": "ou_1", "real_name": "Alice", "email": "a@example.com", "tz": "Asia/Shanghai", "role": "member"}
+        ]
+
+        resp = authed_client.get("/dashboard/api/members")
+
+        assert resp.status_code == 200
+        assert resp.get_json()[0]["id"] == "ou_1"
+
+    def test_feishu_hides_placeholder_admin_member(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_active_members.return_value = [
+            {"user_id": "admin", "real_name": "admin", "email": "", "tz": "Asia/Shanghai", "role": "admin"},
+            {"user_id": "ou_1", "real_name": "Alice", "email": "a@example.com", "tz": "Asia/Shanghai", "role": "member"},
+        ]
+
+        resp = authed_client.get("/dashboard/api/members")
+
+        assert resp.status_code == 200
+        assert [row["id"] for row in resp.get_json()] == ["ou_1"]
+
+    def test_feishu_invite_adds_member_without_slack(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_member_role.return_value = "admin"
+
+        resp = authed_client.post(
+            "/dashboard/api/members/invite",
+            json={"user_id": "ou_2", "name": "Bob", "email": "b@example.com", "role": "admin"},
+        )
+
+        assert resp.status_code == 200
+        _db_mock.upsert_member.assert_called()
+        _db_mock.set_member_role.assert_called_with("feishu", "ou_2", "admin")
+
+    def test_update_member_profile(self, authed_client):
+        _db_mock.get_member_role.return_value = "admin"
+
+        resp = authed_client.put(
+            "/dashboard/api/members/U2",
+            json={"display_name_override": "张三", "tags": ["后端", "负责人", "后端"]},
+        )
+
+        assert resp.status_code == 200
+        _db_mock.update_member_profile.assert_called_once_with(
+            "T123",
+            "U2",
+            display_name_override="张三",
+            tags=["后端", "负责人"],
+        )
+
+    def test_feishu_members_payload_prefers_display_name_override(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_active_members.return_value = [
+            {
+                "user_id": "ou_1",
+                "real_name": "飞书用户7348HB",
+                "display_name_override": "张三",
+                "email": "a@example.com",
+                "tz": "Asia/Shanghai",
+                "role": "member",
+                "tags": ["研发"],
+            }
+        ]
+
+        resp = authed_client.get("/dashboard/api/members")
+
+        assert resp.status_code == 200
+        assert resp.get_json() == [
+            {
+                "id": "ou_1",
+                "name": "张三",
+                "display_name": "张三",
+                "raw_name": "飞书用户7348HB",
+                "avatar": "",
+                "email": "a@example.com",
+                "tz": "Asia/Shanghai",
+                "role": "member",
+                "tags": ["研发"],
+            }
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +383,150 @@ class TestApiStandups:
             json={"name": "New", "channel_id": "C2", "schedule_time": "10:00"},
         )
         assert resp.status_code == 201
+        assert _db_mock.create_standup_schedule.call_args.kwargs["post_summary"] is True
+
+    def test_create_standup_saves_ai_fields(self, authed_client):
+        _db_mock.create_standup_schedule.return_value = {
+            "id": 3,
+            "name": "AI",
+            "channel_id": "C2",
+            "schedule_time": "10:00",
+            "schedule_tz": "UTC",
+            "schedule_days": "mon,tue,wed,thu,fri",
+            "questions": [],
+            "active": True,
+            "participants": [],
+            "reminder_minutes": 0,
+            "ai_summary_enabled": True,
+            "ai_provider": "openai",
+        }
+        resp = authed_client.post(
+            "/dashboard/api/standups",
+            json={"name": "AI", "channel_id": "C2", "ai_summary_enabled": True, "ai_provider": "openai"},
+        )
+
+        assert resp.status_code == 201
+        kwargs = _db_mock.create_standup_schedule.call_args.kwargs
+        assert kwargs["ai_summary_enabled"] is True
+        assert kwargs["ai_provider"] == "openai"
+        assert kwargs["post_summary"] is True
+
+
+class TestApiChannels:
+    def test_feishu_channels_from_env_and_schedules(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        monkeypatch.setenv("FEISHU_DEFAULT_CHAT_ID", "oc_default")
+        monkeypatch.setenv("FEISHU_DEFAULT_CHAT_NAME", "Default")
+        monkeypatch.setenv("FEISHU_CHANNELS", "oc_eng|Engineering")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_workspace_config.return_value = {}
+        _db_mock.get_standup_schedules.return_value = [{"channel_id": "oc_product", "name": "Product"}]
+
+        resp = authed_client.get("/dashboard/api/channels")
+
+        assert resp.status_code == 200
+        ids = {row["id"] for row in resp.get_json()}
+        assert {"oc_default", "oc_eng", "oc_product"}.issubset(ids)
+
+    def test_feishu_channels_include_remote_chat_list(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_workspace_config.return_value = {}
+        _db_mock.get_standup_schedules.return_value = []
+
+        adapter_mod = MagicMock()
+        adapter_instance = adapter_mod.FeishuAdapter.return_value
+        adapter_instance.list_chats.return_value = [{"chat_id": "oc_remote", "name": "Remote Team"}]
+
+        with patch.dict(sys.modules, {"adapters.feishu_adapter": adapter_mod}):
+            resp = authed_client.get("/dashboard/api/channels")
+
+        assert resp.status_code == 200
+        ids = {row["id"] for row in resp.get_json()}
+        assert "oc_remote" in ids
+
+    def test_feishu_channels_preserve_remote_name_over_db_fallback(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_workspace_config.return_value = {"channel_id": "oc_remote"}
+        _db_mock.get_standup_schedules.return_value = []
+
+        adapter_mod = MagicMock()
+        adapter_instance = adapter_mod.FeishuAdapter.return_value
+        adapter_instance.list_chats.return_value = [{"chat_id": "oc_remote", "name": "远程群"}]
+
+        with patch.dict(sys.modules, {"adapters.feishu_adapter": adapter_mod}):
+            resp = authed_client.get("/dashboard/api/channels")
+
+        assert resp.status_code == 200
+        assert resp.get_json() == [{"id": "oc_remote", "name": "远程群"}]
+
+    def test_feishu_channels_ignore_placeholder_workspace_channel(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_workspace_config.return_value = {"channel_id": "oc_demo"}
+        _db_mock.get_standup_schedules.return_value = []
+
+        adapter_mod = MagicMock()
+        adapter_instance = adapter_mod.FeishuAdapter.return_value
+        adapter_instance.list_chats.return_value = []
+
+        with patch.dict(sys.modules, {"adapters.feishu_adapter": adapter_mod}):
+            resp = authed_client.get("/dashboard/api/channels")
+
+        assert resp.status_code == 200
+        assert resp.get_json() == []
+
+    def test_feishu_members_sync_default_chat_when_no_channel_id(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        monkeypatch.setenv("FEISHU_DEFAULT_CHAT_ID", "oc_default")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_workspace_config.return_value = {}
+        _db_mock.get_active_members.return_value = []
+
+        adapter_mod = MagicMock()
+        adapter_instance = adapter_mod.FeishuAdapter.return_value
+        adapter_instance.list_chat_members.return_value = [{"member_id": "ou_1", "name": "Alice"}]
+
+        with patch.dict(sys.modules, {"adapters.feishu_adapter": adapter_mod}):
+            resp = authed_client.get("/dashboard/api/members")
+
+        assert resp.status_code == 200
+        _db_mock.upsert_member.assert_called()
+
+    def test_feishu_members_do_not_sync_placeholder_channel(self, authed_client, monkeypatch):
+        monkeypatch.setenv("FEISHU_APP_ID", "cli_x")
+        monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+        monkeypatch.setenv("FEISHU_DEFAULT_CHAT_ID", "oc_demo")
+        with authed_client.session_transaction() as sess:
+            sess["team_id"] = "feishu"
+            sess["user_id"] = "ou_admin"
+        _db_mock.get_active_members.return_value = []
+
+        adapter_mod = MagicMock()
+        adapter_instance = adapter_mod.FeishuAdapter.return_value
+        adapter_instance.list_chat_members.return_value = [{"member_id": "ou_1", "name": "Alice"}]
+
+        with patch.dict(sys.modules, {"adapters.feishu_adapter": adapter_mod}):
+            resp = authed_client.get("/dashboard/api/members")
+
+        assert resp.status_code == 200
+        adapter_instance.list_chat_members.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

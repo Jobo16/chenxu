@@ -166,7 +166,7 @@ def oauth_callback():
             bot_client.chat_postMessage(
                 channel=dm_channel,
                 text=(
-                    "👋 Welcome to Morgenruf! I'll ping you every morning for your standup. "
+                    "👋 Welcome to 晨序! I'll ping you every morning for your standup. "
                     "Type `help` to see what I can do."
                 ),
             )

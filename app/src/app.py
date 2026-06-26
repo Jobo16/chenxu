@@ -1,4 +1,4 @@
-"""Morgenruf Slack app entry point."""
+"""晨序 Slack app entry point."""
 
 from __future__ import annotations
 

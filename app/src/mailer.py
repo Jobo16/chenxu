@@ -107,7 +107,7 @@ def send_weekly_digest(
   </p>
 </td></tr>
 <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;font-size:12px;color:#9ca3af;">
-  Morgenruf · Self-hosted standup bot · <a href="https://morgenruf.dev" style="color:#6366f1;text-decoration:none;">morgenruf.dev</a>
+  晨序 · Self-hosted standup bot · <a href="https://morgenruf.dev" style="color:#6366f1;text-decoration:none;">morgenruf.dev</a>
 </td></tr>
 </table>
 </td></tr>
@@ -135,7 +135,7 @@ def send_welcome_email(to_email: str, team_name: str, installed_by: str) -> None
             {
                 "from": "hello@morgenruf.dev",
                 "to": to_email,
-                "subject": f"Morgenruf is now active in {team_name}",
+                "subject": f"晨序 is now active in {team_name}",
                 "html": welcome_email_html(team_name, installed_by),
             }
         )
@@ -160,7 +160,7 @@ def welcome_email_html(team_name: str, installed_by: str) -> str:
           <tr>
             <td style="background:#4f46e5;padding:32px 40px;text-align:center;">
               <div style="font-size:32px;margin-bottom:8px;">🌅</div>
-              <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Morgenruf</div>
+              <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">晨序</div>
               <div style="color:#c7d2fe;font-size:13px;margin-top:4px;">Your daily standup bot</div>
             </td>
           </tr>
@@ -169,7 +169,7 @@ def welcome_email_html(team_name: str, installed_by: str) -> str:
             <td style="padding:36px 40px;">
               <p style="font-size:20px;font-weight:700;color:#1a1a1a;margin:0 0 8px;">Good morning! ☀️</p>
               <p style="font-size:15px;color:#555;margin:0 0 28px;line-height:1.6;">
-                Morgenruf has been successfully installed in <strong style="color:#1a1a1a;">{team_name}</strong> by {installed_by}.
+                晨序 has been successfully installed in <strong style="color:#1a1a1a;">{team_name}</strong> by {installed_by}.
               </p>
 
               <p style="font-size:13px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 16px;">What happens next</p>
@@ -215,7 +215,7 @@ def welcome_email_html(team_name: str, installed_by: str) -> str:
           <tr>
             <td style="padding:20px 40px;background:#f8f8f8;border-top:1px solid #eee;text-align:center;">
               <p style="font-size:12px;color:#999;margin:0;">
-                The Morgenruf team · <a href="https://morgenruf.dev" style="color:#4f46e5;text-decoration:none;">morgenruf.dev</a>
+                The 晨序 team · <a href="https://morgenruf.dev" style="color:#4f46e5;text-decoration:none;">morgenruf.dev</a>
               </p>
             </td>
           </tr>
@@ -371,7 +371,7 @@ def first_standup_email_html(
     )
     return _email_wrapper(
         content,
-        footer_extra="You're receiving this because you installed Morgenruf in " + team_name + ".",
+        footer_extra="You're receiving this because you installed 晨序 in " + team_name + ".",
     )
 
 
@@ -528,7 +528,7 @@ def send_release_announcement_email(
                 "from": "hello@morgenruf.dev",
                 "reply_to": "support@morgenruf.dev",
                 "to": to_email,
-                "subject": "Morgenruf " + version + " is here \u2728",
+                "subject": "晨序 " + version + " is here \u2728",
                 "html": release_announcement_email_html(team_name, version, changelog_url),
             }
         )
@@ -548,9 +548,9 @@ def release_announcement_email_html(
     changelog_url: str,
 ) -> str:
     content = (
-        _h1("Morgenruf " + version + " is here \u2728")
+        _h1("晨序 " + version + " is here \u2728")
         + _p(
-            "Hi <strong style='color:#e5e5e5;'>" + team_name + "</strong> — we just shipped a new version of Morgenruf."
+            "Hi <strong style='color:#e5e5e5;'>" + team_name + "</strong> — we just shipped a new version of 晨序."
         )
         + _p(
             "This release includes improvements and fixes to make your daily standups "
@@ -606,7 +606,7 @@ def send_manager_digest(manager_email: str, workspace_name: str, standups: list,
   </tr></thead>
   <tbody>{rows}</tbody>
 </table>
-<p style="margin-top:30px;color:#999;font-size:12px">Sent by <a href="https://morgenruf.dev">Morgenruf</a> · <a href="https://morgenruf.dev">Manage settings</a></p>
+<p style="margin-top:30px;color:#999;font-size:12px">Sent by <a href="https://morgenruf.dev">晨序</a> · <a href="https://morgenruf.dev">Manage settings</a></p>
 </body></html>"""
 
     _send(

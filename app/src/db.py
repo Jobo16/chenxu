@@ -210,6 +210,48 @@ def get_workspace_by_feed_token(token: str) -> dict | None:
     return dict(row) if row else None
 
 
+# ---------------------------------------------------------------------------
+# App settings
+# ---------------------------------------------------------------------------
+
+
+def get_app_setting(key: str) -> str | None:
+    """Return a Dashboard-managed app setting value."""
+    sql = "SELECT setting_value FROM app_settings WHERE setting_key = %s"
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (key,))
+            row = cur.fetchone()
+    return row[0] if row else None
+
+
+def get_app_settings() -> dict[str, str]:
+    """Return all Dashboard-managed app settings."""
+    sql = "SELECT setting_key, setting_value FROM app_settings ORDER BY setting_key"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+    return {r["setting_key"]: r["setting_value"] for r in rows}
+
+
+def set_app_settings(settings: dict[str, str]) -> None:
+    """Upsert Dashboard-managed app settings."""
+    if not settings:
+        return
+    sql = """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (setting_key) DO UPDATE SET
+            setting_value = EXCLUDED.setting_value,
+            updated_at = NOW()
+    """
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            for key, value in settings.items():
+                cur.execute(sql, (key, value))
+
+
 def get_standups(
     team_id: str,
     days: int = 1,
@@ -266,7 +308,11 @@ def get_standups(
 
 def get_active_members(team_id: str) -> list[dict]:
     """Return active members for a workspace."""
-    sql = "SELECT * FROM members WHERE team_id = %s AND active = TRUE ORDER BY real_name"
+    sql = """
+        SELECT * FROM members
+        WHERE team_id = %s AND active = TRUE
+        ORDER BY COALESCE(NULLIF(display_name_override, ''), NULLIF(real_name, ''), user_id)
+    """
     with db_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, (team_id,))
@@ -294,6 +340,33 @@ def upsert_member(
     with db_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (team_id, user_id, real_name, email, tz))
+
+
+def update_member_profile(
+    team_id: str,
+    user_id: str,
+    *,
+    display_name_override: str | None = None,
+    tags: list[str] | None = None,
+) -> None:
+    """Update local member metadata such as display name override and tags."""
+    updates: list[str] = []
+    values: list[Any] = []
+
+    if display_name_override is not None:
+        updates.append("display_name_override = %s")
+        values.append(display_name_override.strip() or None)
+    if tags is not None:
+        updates.append("tags = %s")
+        values.append(json.dumps(tags))
+
+    if not updates:
+        return
+
+    sql = f"UPDATE members SET {', '.join(updates)} WHERE team_id = %s AND user_id = %s"
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, [*values, team_id, user_id])
 
 
 # ---------------------------------------------------------------------------
@@ -635,6 +708,8 @@ def create_standup_schedule(team_id: str, **kwargs) -> dict:
         "prepopulate_answers",
         "allow_edit_after_report",
         "post_summary",
+        "ai_summary_enabled",
+        "ai_provider",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if "questions" in fields and isinstance(fields["questions"], list):
@@ -816,6 +891,8 @@ def update_standup_schedule(team_id: str, schedule_id: int, **kwargs) -> dict | 
         "prepopulate_answers",
         "allow_edit_after_report",
         "post_summary",
+        "ai_summary_enabled",
+        "ai_provider",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:

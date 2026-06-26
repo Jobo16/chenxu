@@ -27,6 +27,7 @@ class UserSession:
     cache_key: str  # "team_id:user_id"
     team_id: str
     channel: str  # target channel for the summary post
+    response_chat_id: str = ""  # exact Feishu private chat that is allowed to answer this session
     step: int = 0  # 0=sent q1, 1=sent q2, 2=sent q3, 3=mood, 4=done
     answers: list[str] = field(default_factory=list)
     started_at: datetime = field(default_factory=datetime.utcnow)
@@ -46,6 +47,7 @@ def _serialize(session: "UserSession") -> dict:
         "cache_key": session.cache_key,
         "team_id": session.team_id,
         "channel": session.channel,
+        "response_chat_id": session.response_chat_id,
         "step": session.step,
         "answers": session.answers,
         "questions": session.questions,
@@ -61,6 +63,7 @@ def _deserialize(data: dict) -> "UserSession":
         cache_key=data["cache_key"],
         team_id=data.get("team_id", ""),
         channel=data.get("channel", ""),
+        response_chat_id=data.get("response_chat_id", ""),
         step=data.get("step", 0),
         answers=data.get("answers", []),
         questions=data.get("questions", list(QUESTIONS)),
@@ -83,6 +86,7 @@ class StateStore:
         channel: str,
         *,
         team_id: str = "",
+        response_chat_id: str = "",
         questions: list[str] | None = None,
         standup_name: str = "Team Standup",
         schedule_id: Optional[int] = None,
@@ -98,12 +102,23 @@ class StateStore:
                 cache_key=cache_key,
                 team_id=team_id,
                 channel=channel,
+                response_chat_id=response_chat_id,
                 questions=list(questions) if questions is not None else list(QUESTIONS),
                 standup_name=standup_name,
                 schedule_id=schedule_id,
                 editing_standup_id=editing_standup_id,
                 edit_initial_answers=list(edit_initial_answers) if edit_initial_answers else [],
             )
+            session_store.set_session(cache_key, _serialize(session))
+            return session
+
+    def bind_response_chat(self, cache_key: str, response_chat_id: str) -> Optional[UserSession]:
+        with self._lock:
+            data = session_store.get_session(cache_key)
+            if not data:
+                return None
+            session = _deserialize(data)
+            session.response_chat_id = response_chat_id
             session_store.set_session(cache_key, _serialize(session))
             return session
 

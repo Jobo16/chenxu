@@ -43,7 +43,7 @@ def google_events():
         if event_type == "MESSAGE":
             return _handle_message(payload)
         elif event_type == "ADDED_TO_SPACE":
-            return jsonify({"text": "👋 Thanks for adding Morgenruf! Use `/standup` to start a standup."})
+            return jsonify({"text": "👋 Thanks for adding 晨序! Use `/standup` to start a standup."})
 
         return jsonify({}), 200
     except Exception as exc:
@@ -82,7 +82,7 @@ def _handle_message(payload: dict):
         return jsonify(
             {
                 "text": (
-                    "*Morgenruf Standup Bot* 🌅\n"
+                    "*晨序 Standup Bot* 🌅\n"
                     "• `/standup` — start your standup\n"
                     "• `/skip` — skip today\n"
                     "• `/help` — show this message"

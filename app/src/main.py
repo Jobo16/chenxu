@@ -9,8 +9,11 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 import sentry_sdk
+from dotenv import load_dotenv
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+
+load_dotenv(override=True)
 
 _sentry_dsn = os.environ.get("SENTRY_DSN", "")
 if _sentry_dsn:
@@ -25,6 +28,7 @@ if _sentry_dsn:
     )
     logging.getLogger(__name__).info("Sentry error monitoring enabled")
 
+from app_settings import get_setting
 from dashboard import dashboard_bp
 from flask import Flask, jsonify, request
 from handlers import register_handlers
@@ -42,6 +46,15 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _should_start_background_workers() -> bool:
+    is_dev = _env_flag("FLASK_DEBUG") or os.environ.get("LOG_LEVEL", "").upper() == "DEBUG"
+    return (not is_dev) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
 
 def _load_workspace_jobs() -> list[tuple[str, str, dict]]:
@@ -83,10 +96,20 @@ def create_app() -> tuple[App, Flask]:
 
     register_handlers(slack_app)
 
+    try:
+        from feishu_bootstrap import ensure_feishu_workspace  # noqa: PLC0415
+
+        ensure_feishu_workspace()
+    except Exception as exc:
+        logger.warning("Feishu bootstrap failed during startup: %s", exc)
+
     workspace_jobs = _load_workspace_jobs()
     scheduler = build_scheduler(workspace_jobs)
-    scheduler.start()
-    logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
+    if _should_start_background_workers():
+        scheduler.start()
+        logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))
+    else:
+        logger.info("Skipping background worker startup in reloader parent process")
 
     flask_app = Flask(__name__)
     # Trust Cloudflare/reverse-proxy headers so Flask knows the request is HTTPS
@@ -96,7 +119,7 @@ def create_app() -> tuple[App, Flask]:
         logger.warning("FLASK_SECRET_KEY not set — using random key (sessions will not persist across restarts)")
         secret_key = os.urandom(32)
     flask_app.secret_key = secret_key
-    flask_app.config["SESSION_COOKIE_SECURE"] = True
+    flask_app.config["SESSION_COOKIE_SECURE"] = get_setting("APP_URL", "http://localhost:3000").startswith("https://")
     flask_app.config["SESSION_COOKIE_HTTPONLY"] = True
     flask_app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     flask_app.register_blueprint(oauth_bp)
@@ -114,6 +137,19 @@ def create_app() -> tuple[App, Flask]:
             logger.info("Google Chat integration enabled")
         except Exception as exc:
             logger.warning("Could not register Google Chat blueprint: %s", exc)
+
+    try:
+        from feishu_longconn import feishu_event_mode, feishu_longconn_service  # noqa: PLC0415
+
+        if feishu_event_mode() == "webhook":
+            from feishu_handler import feishu_bp  # noqa: PLC0415
+
+            flask_app.register_blueprint(feishu_bp)
+            logger.info("Feishu webhook endpoint enabled at /feishu/events")
+        elif _should_start_background_workers():
+            feishu_longconn_service.start()
+    except Exception as exc:
+        logger.warning("Could not initialize Feishu event transport: %s", exc)
 
     handler = SlackRequestHandler(slack_app)
 
@@ -138,7 +174,7 @@ if __name__ == "__main__":
     logger.info("Starting standup bot on port %d", port)
 
     # Use gunicorn in production, Flask dev server only when DEBUG
-    if os.environ.get("FLASK_DEBUG") or os.environ.get("LOG_LEVEL", "").upper() == "DEBUG":
+    if _env_flag("FLASK_DEBUG") or os.environ.get("LOG_LEVEL", "").upper() == "DEBUG":
         flask_app.run(host="0.0.0.0", port=port, debug=True)
     else:
         from gunicorn.app.base import BaseApplication

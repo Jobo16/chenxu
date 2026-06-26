@@ -1,0 +1,2 @@
+ALTER TABLE members ADD COLUMN IF NOT EXISTS display_name_override TEXT;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb;

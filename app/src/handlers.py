@@ -1152,7 +1152,7 @@ def register_handlers(app: App) -> None:
     @app.event("app_mention")
     def handle_mention(event, say):  # noqa: ANN001
         say(
-            "👋 I'm Morgenruf, your standup bot! Use `/help` to see available commands or check your *App Home* tab for settings and history."
+            "👋 I'm 晨序, your standup bot! Use `/help` to see available commands or check your *App Home* tab for settings and history."
         )
 
     @app.event("member_joined_channel")
@@ -1177,7 +1177,7 @@ def register_handlers(app: App) -> None:
             client.chat_postMessage(
                 channel=user_id,
                 text=(
-                    "👋 Welcome to the team! I'm Morgenruf, your daily standup bot.\n\n"
+                    "👋 Welcome to the team! I'm 晨序, your daily standup bot.\n\n"
                     "I'll DM you each morning with a few quick questions to share with your team. "
                     "Use `/standup` to try a standup now, or `/help` to learn more."
                 ),
@@ -1316,9 +1316,9 @@ def register_handlers(app: App) -> None:
         user_id: str = body["user_id"]
         client.chat_postMessage(
             channel=user_id,
-            text="Morgenruf Help",
+            text="晨序 Help",
             blocks=[
-                {"type": "header", "text": {"type": "plain_text", "text": "🌅 Morgenruf — Commands"}},
+                {"type": "header", "text": {"type": "plain_text", "text": "晨序 — Commands"}},
                 {
                     "type": "section",
                     "text": {
@@ -1332,7 +1332,7 @@ def register_handlers(app: App) -> None:
                             "*Other ways to interact:*\n"
                             "• Reply to a standup DM at any time to start\n"
                             "• Use the *App Home* tab to see your history and settings\n"
-                            "• Mention `@Morgenruf` in any channel for help\n\n"
+                            "• Mention `@晨序` in any channel for help\n\n"
                             "📖 Full docs: <https://docs.morgenruf.dev|docs.morgenruf.dev>"
                         ),
                     },

@@ -1,6 +1,6 @@
 # Slack App Directory Submission Checklist
 
-> **App:** Morgenruf — Daily standups for Slack  
+> **App:** 晨序 — Daily standups for Slack  
 > **Category:** Productivity  
 > Reference this document before submitting to the [Slack App Directory](https://api.slack.com/start/distributing).
 
@@ -16,9 +16,9 @@ Free, open-source Slack standup bot. Schedule daily standups, collect answers pr
 
 ### Long Description
 ```
-Morgenruf runs your team's daily standups directly in Slack — no expensive SaaS subscription required.
+晨序 runs your team's daily standups directly in Slack — no expensive SaaS subscription required.
 
-Each day at your configured time, Morgenruf DMs each team member with your custom questions, collects answers privately, and posts a clean formatted summary to your team channel — including blocker highlighting and mood tracking.
+Each day at your configured time, 晨序 DMs each team member with your custom questions, collects answers privately, and posts a clean formatted summary to your team channel — including blocker highlighting and mood tracking.
 
 Key highlights:
 • 100% free and open-source (MIT) — self-host or use the hosted version at morgenruf.dev
@@ -33,7 +33,7 @@ Key highlights:
 • App Home tab shows workspace standup status at a glance
 • Kubernetes-ready with a production Helm chart
 
-Morgenruf is a drop-in replacement for Geekbot, Standup & Prosper, and similar paid tools — with full data ownership.
+晨序 is a drop-in replacement for Geekbot, Standup & Prosper, and similar paid tools — with full data ownership.
 ```
 
 ### App Category Recommendation
@@ -100,14 +100,14 @@ Slack requires at least **3 screenshots** (1280×800 px or 2560×1600 px @2x, PN
 | `users:read` | Look up user display names and status for standup participation tracking |
 | `users:read.email` | Associate Slack users with workspace accounts for the web dashboard |
 | `team:read` | Retrieve workspace name and domain for multi-workspace support and dashboard display |
-| `app_mentions:read` | Receive `@Morgenruf` mentions so users can trigger commands from channels |
+| `app_mentions:read` | Receive `@晨序` mentions so users can trigger commands from channels |
 
 ### Event Subscriptions Justification
 
 | Event | Justification |
 |---|---|
 | `app_home_opened` | Render the App Home tab with the workspace's standup status when a user opens it |
-| `app_mention` | Handle `@Morgenruf` commands triggered from channels |
+| `app_mention` | Handle `@晨序` commands triggered from channels |
 | `message.im` | Receive standup answers and text commands (`skip`, `timezone`, `standup`) sent in DMs |
 | `member_joined_channel` | Detect when the bot joins a channel so it can confirm configuration |
 
@@ -139,7 +139,7 @@ Slack requires at least **3 screenshots** (1280×800 px or 2560×1600 px @2x, PN
 
 ### Fresh Install Test
 - [ ] Create a new Slack test workspace (free plan is fine)
-- [ ] Install Morgenruf from scratch via `https://<your-domain>/install`
+- [ ] Install 晨序 from scratch via `https://<your-domain>/install`
 - [ ] Complete the OAuth flow — verify redirect lands correctly and token is stored
 - [ ] Confirm the App Home tab loads after install
 
@@ -149,7 +149,7 @@ Slack requires at least **3 screenshots** (1280×800 px or 2560×1600 px @2x, PN
 - [ ] DM `skip` — bot acknowledges and skips today's standup for that user
 - [ ] DM `timezone America/New_York` — bot confirms timezone was updated
 - [ ] DM `help` — bot responds with available commands
-- [ ] Mention `@Morgenruf` in a channel — verify bot responds appropriately
+- [ ] Mention `@晨序` in a channel — verify bot responds appropriately
 
 ### Scheduled Standup
 - [ ] Configure a standup time 5 minutes in the future

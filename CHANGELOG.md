@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Morgenruf are documented here.
+All notable changes to 晨序 are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com) | Versioning: [SemVer](https://semver.org)
 
 ## [Unreleased]

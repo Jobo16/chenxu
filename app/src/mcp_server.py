@@ -1,4 +1,4 @@
-"""Morgenruf MCP Server — expose standup data to AI assistants.
+"""晨序 MCP Server — expose standup data to AI assistants.
 
 Allows Claude, Cursor, Copilot, and other MCP-capable tools to query
 standup history, participation, blockers, and more.
@@ -382,7 +382,7 @@ async def _get_workspace_summary(args: dict) -> CallToolResult:
     channel = config.get("channel_id", "not configured")
 
     summary = (
-        f"☀️  Morgenruf — {team_name} ({team_id})\n\n"
+        f"☀️  晨序 — {team_name} ({team_id})\n\n"
         f"  Schedule:       {schedule}\n"
         f"  Channel:        {channel}\n"
         f"  Active members: {len(members)}\n"
@@ -435,7 +435,7 @@ async def _get_mood_summary(args: dict) -> CallToolResult:
 
 
 async def main() -> None:
-    logger.info("Starting Morgenruf MCP server (team_id=%s)", _DEFAULT_TEAM_ID or "dynamic")
+    logger.info("Starting 晨序 MCP server (team_id=%s)", _DEFAULT_TEAM_ID or "dynamic")
     async with stdio_server() as streams:
         await server.run(streams[0], streams[1], server.create_initialization_options())
 

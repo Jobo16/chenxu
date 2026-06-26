@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pytz
+from app_settings import get_setting
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -26,6 +27,20 @@ logger = logging.getLogger(__name__)
 
 # Module-level scheduler reference so oauth.py can access it after startup
 _scheduler: Optional[BackgroundScheduler] = None
+
+
+def _feishu_team_id() -> str:
+    return get_setting("FEISHU_TEAM_ID") or get_setting("FEISHU_TENANT_KEY") or "feishu"
+
+
+def _is_feishu_workspace(team_id: str, bot_token: str | None = None) -> bool:
+    return bool(get_setting("FEISHU_APP_ID") and get_setting("FEISHU_APP_SECRET") and team_id == _feishu_team_id())
+
+
+def _get_feishu_adapter():
+    from adapters.feishu_adapter import FeishuAdapter  # noqa: PLC0415
+
+    return FeishuAdapter()
 
 
 def get_scheduler() -> Optional[BackgroundScheduler]:
@@ -139,7 +154,7 @@ def _force_refresh_bot_token(team_id: str) -> str | None:
 def _alert_token_refresh_failure(team_id: str, reason: str) -> None:
     """Loud alert when a refresh attempt fails — workspace likely needs to reinstall."""
     logger.error(
-        "TOKEN_REFRESH_FAILURE team=%s reason=%s — workspace may need to reinstall Morgenruf",
+        "TOKEN_REFRESH_FAILURE team=%s reason=%s — workspace may need to reinstall 晨序",
         team_id,
         reason,
     )
@@ -159,11 +174,11 @@ def _alert_token_refresh_failure(team_id: str, reason: str) -> None:
             {
                 "from": "alerts@morgenruf.dev",
                 "to": ops_email,
-                "subject": f"[Morgenruf] Token refresh failed for team {team_id}",
+                "subject": f"[晨序] Token refresh failed for team {team_id}",
                 "html": (
                     f"<p>Bot-token refresh failed for team <code>{team_id}</code>.</p>"
                     f"<p><b>Reason:</b> {reason}</p>"
-                    "<p>Scheduled standups for this workspace will fail until the workspace reinstalls Morgenruf.</p>"
+                    "<p>Scheduled standups for this workspace will fail until the workspace reinstalls 晨序.</p>"
                 ),
             }
         )
@@ -284,6 +299,67 @@ def _notify_delivery_failure(client: WebClient, channel_id: str, failed_count: i
         logger.warning("Could not post delivery failure notice to %s: %s", channel_id, exc)
 
 
+def _notify_feishu_delivery_failure(adapter, channel_id: str, failed_count: int, total_count: int) -> None:
+    if not channel_id or failed_count == 0:
+        return
+    try:
+        adapter.post_to_channel(channel_id, f"站会私聊发送失败：{failed_count}/{total_count} 人未收到。")
+    except Exception as exc:
+        logger.warning("Could not post Feishu delivery failure notice to %s: %s", channel_id, exc)
+
+
+def _send_feishu_standup_to_workspace(
+    team_id: str,
+    channel_id: str,
+    schedule_id: int | None,
+    members: list[dict],
+    questions: list[str] | None,
+    standup_name: str,
+) -> None:
+    adapter = _get_feishu_adapter()
+    default_questions = questions or [
+        "昨天完成了什么？",
+        "今天计划做什么？",
+        "有什么阻塞？没有就回复“无”。",
+    ]
+    failed_count = 0
+    dm_count = 0
+
+    for member in members:
+        user_id = member["user_id"]
+        cache_key = f"{team_id}:{user_id}"
+        try:
+            if state_store.is_active(cache_key):
+                logger.debug("Skipping %s — already has active session", user_id)
+                continue
+
+            try:
+                import db  # noqa: PLC0415
+
+                if db.is_skipped_today(team_id, user_id) or db.is_on_vacation(team_id, user_id):
+                    continue
+            except Exception as exc:
+                logger.warning("Could not check skip/vacation state for %s/%s: %s", team_id, user_id, exc)
+
+            dm_count += 1
+            adapter.send_dm(user_id, f"{standup_name}\n\n{default_questions[0]}")
+            state_store.start(
+                cache_key,
+                channel_id,
+                team_id=team_id,
+                questions=default_questions,
+                standup_name=standup_name,
+                schedule_id=schedule_id,
+            )
+            logger.info("Sent Feishu standup DM to %s / %s", team_id, user_id)
+        except Exception as exc:
+            failed_count += 1
+            logger.error("Failed to send Feishu DM to %s / %s: %s", team_id, user_id, exc)
+
+    if failed_count > 0:
+        _notify_feishu_delivery_failure(adapter, channel_id, failed_count, dm_count)
+
+
 def _send_standup_to_workspace(team_id: str, bot_token: str, channel_id: str, schedule_id: int | None = None) -> None:
     """DM participants of a standup schedule (or all active members if no schedule)."""
     bot_token = _fresh_bot_token(team_id, bot_token)
@@ -329,6 +405,10 @@ def _send_standup_to_workspace(team_id: str, bot_token: str, channel_id: str, sc
         return
 
     logger.info("Triggering standup for team %s (%d members)", team_id, len(members))
+
+    if _is_feishu_workspace(team_id, bot_token):
+        _send_feishu_standup_to_workspace(team_id, channel_id, schedule_id, members, questions, standup_name)
+        return
 
     # Verify bot token is still valid before DMing members. If the token is stale,
     # force-refresh once and retry with the new token before giving up.
@@ -476,6 +556,22 @@ def _send_reminder_to_workspace(
     except Exception as exc:
         logger.error("Could not load members for reminder %s: %s", team_id, exc)
         return
+
+    if _is_feishu_workspace(team_id, bot_token):
+        adapter = _get_feishu_adapter()
+        for member in members:
+            user_id = member["user_id"]
+            try:
+                import db  # noqa: PLC0415
+
+                if db.is_skipped_today(team_id, user_id):
+                    continue
+                label = f"：{standup_label}" if standup_label else ""
+                adapter.send_dm(user_id, f"站会{label} 将在 {reminder_minutes} 分钟后开始。")
+            except Exception as exc:
+                logger.warning("Failed Feishu reminder DM to %s / %s: %s", team_id, user_id, exc)
+        return
+
     client = WebClient(token=bot_token)
     for member in members:
         user_id = member["user_id"]
@@ -558,6 +654,77 @@ def _send_manager_digest(team_id: str) -> None:
         logger.warning("Manager digest failed for %s: %s", team_id, exc)
 
 
+def _post_feishu_scheduled_report(
+    team_id: str,
+    channel_id: str,
+    schedule_id: int | None,
+    today_standups: list[dict],
+    questions: list[str] | None,
+    sched_cfg: dict | None = None,
+) -> None:
+    if not channel_id:
+        logger.info("No Feishu report channel configured for %s — skipping report", team_id)
+        return
+
+    try:
+        import db  # noqa: PLC0415
+
+        members = {m["user_id"]: m for m in db.get_active_members(team_id)}
+        adapter = _get_feishu_adapter()
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        labels = questions or ["昨天完成了什么？", "今天计划做什么？", "有什么阻塞？"]
+        lines = [f"每日站会汇总 - {date_str}"]
+
+        for row in today_standups:
+            user_id = row.get("user_id", "")
+            member = members.get(user_id, {})
+            name = member.get("real_name") or user_id
+            lines.append("")
+            lines.append(f"{name}")
+            values = [
+                row.get("yesterday") or "—",
+                row.get("today") or "—",
+                row.get("blockers") or "—",
+            ]
+            for label, value in zip(labels, values):
+                lines.append(f"{label}\n{value}")
+            if row.get("mood"):
+                lines.append(f"状态\n{row['mood']}")
+
+        adapter.post_to_channel(channel_id, "\n\n".join(lines))
+        logger.info(
+            "Posted Feishu scheduled report for team %s schedule %s (%d submissions)",
+            team_id,
+            schedule_id,
+            len(today_standups),
+        )
+
+        ws_config = db.get_workspace_config(team_id) or {}
+        ai_summary_enabled = (
+            bool(sched_cfg.get("ai_summary_enabled"))
+            if sched_cfg and "ai_summary_enabled" in sched_cfg
+            else bool(ws_config.get("ai_summary_enabled"))
+        )
+        if ai_summary_enabled:
+            try:
+                from ai_summary import generate_summary  # noqa: PLC0415
+
+                inst = db.get_installation(team_id)
+                team_name = (inst or {}).get("team_name", "")
+                ai_provider = (
+                    sched_cfg.get("ai_provider")
+                    if sched_cfg and sched_cfg.get("ai_provider")
+                    else ws_config.get("ai_provider")
+                )
+                summary_text = generate_summary(today_standups, team_name, provider=ai_provider)
+                if summary_text:
+                    adapter.post_to_channel(channel_id, f"AI Summary\n\n{summary_text}")
+            except Exception as exc:
+                logger.warning("Feishu AI summary failed for %s/%s: %s", team_id, schedule_id, exc)
+    except Exception as exc:
+        logger.error("Feishu scheduled report failed for %s/%s: %s", team_id, schedule_id, exc)
+
+
 def _post_scheduled_report(team_id: str, bot_token: str, channel_id: str, schedule_id: int | None = None) -> None:
     """Post the standup report at the scheduled report_time, regardless of completion."""
     bot_token = _fresh_bot_token(team_id, bot_token)
@@ -570,14 +737,6 @@ def _post_scheduled_report(team_id: str, bot_token: str, channel_id: str, schedu
         if not today_standups:
             logger.info("No submissions for team %s — skipping report", team_id)
             return
-
-        client = WebClient(token=bot_token)
-        try:
-            _call_with_auth_retry(team_id, client, lambda c: c.auth_test())
-        except Exception as exc:
-            logger.error("Bot token invalid for report %s: %s", team_id, exc)
-            return
-        bot_token = client.token
 
         sched_cfg = {}
         if schedule_id:
@@ -620,6 +779,18 @@ def _post_scheduled_report(team_id: str, bot_token: str, channel_id: str, schedu
                     questions = _json.loads(questions)
                 except Exception:
                     questions = []
+
+        if _is_feishu_workspace(team_id, bot_token):
+            _post_feishu_scheduled_report(team_id, channel_id, schedule_id, today_standups, questions, sched_cfg)
+            return
+
+        client = WebClient(token=bot_token)
+        try:
+            _call_with_auth_retry(team_id, client, lambda c: c.auth_test())
+        except Exception as exc:
+            logger.error("Bot token invalid for report %s: %s", team_id, exc)
+            return
+        bot_token = client.token
 
         # Only fetch profiles for relevant members
         relevant_user_ids = {s.get("user_id") for s in today_standups}
@@ -675,10 +846,20 @@ def _post_scheduled_report(team_id: str, bot_token: str, channel_id: str, schedu
             from ai_summary import generate_summary  # noqa: PLC0415
 
             ws_config = db.get_workspace_config(team_id) or {}
-            if ws_config.get("ai_summary_enabled"):
+            ai_summary_enabled = (
+                bool(sched_cfg.get("ai_summary_enabled"))
+                if sched_cfg and "ai_summary_enabled" in sched_cfg
+                else bool(ws_config.get("ai_summary_enabled"))
+            )
+            if ai_summary_enabled:
                 inst = db.get_installation(team_id)
                 team_name = (inst or {}).get("team_name", "")
-                summary_text = generate_summary(today_standups, team_name)
+                ai_provider = (
+                    sched_cfg.get("ai_provider")
+                    if sched_cfg and sched_cfg.get("ai_provider")
+                    else ws_config.get("ai_provider")
+                )
+                summary_text = generate_summary(today_standups, team_name, provider=ai_provider)
                 if summary_text:
                     ai_kwargs = {"channel": channel_id, "text": f"✨ *AI Summary*\n\n{summary_text}"}
                     if summary_thread_ts:

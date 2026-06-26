@@ -5,7 +5,7 @@ import sys
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
-from ai_summary import _plain_summary, generate_summary
+from ai_summary import _chat_completions_url, _plain_summary, generate_summary
 
 # ---------------------------------------------------------------------------
 # Plain summary (no AI key)
@@ -98,6 +98,34 @@ class TestGenerateSummary:
             result = generate_summary(standups, "Team")
         assert result == "The team made solid progress."
 
+    def test_uses_deepseek_when_provider_selected(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-deepseek")
+        monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "DeepSeek response"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            standups = [{"user_id": "U1", "yesterday": "a", "today": "b", "has_blockers": False}]
+            result = generate_summary(standups, "Team", provider="deepseek")
+
+        assert result == "DeepSeek response"
+        assert mock_post.call_args.args[0] == "https://api.deepseek.com/v1/chat/completions"
+        assert mock_post.call_args.kwargs["json"]["model"] == "deepseek-chat"
+
+    def test_provider_selected_without_key_returns_empty(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+        standups = [{"user_id": "U1", "yesterday": "a", "today": "b", "has_blockers": False}]
+        result = generate_summary(standups, "Team", provider="deepseek")
+
+        assert result == ""
+
     def test_openai_failure_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -132,3 +160,15 @@ class TestGenerateSummary:
         call_url = mock_post.call_args[0][0]
         assert "openai.com" in call_url
         assert result == "OpenAI response"
+
+
+class TestOpenAICompatibleURL:
+    def test_adds_v1_chat_completions(self):
+        assert _chat_completions_url("https://api.deepseek.com") == "https://api.deepseek.com/v1/chat/completions"
+
+    def test_accepts_base_url_with_v1(self):
+        assert _chat_completions_url("https://api.example.com/v1") == "https://api.example.com/v1/chat/completions"
+
+    def test_accepts_full_chat_completions_url(self):
+        url = "https://api.example.com/v1/chat/completions"
+        assert _chat_completions_url(url) == url

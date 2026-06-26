@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Morgenruf Dashboard</title>
+  <title>晨序控制台</title>
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png"/>
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
   <link rel="apple-touch-icon" href="/static/icon-512.png"/>
@@ -416,7 +416,10 @@
     .member-info { flex: 1; min-width: 0; }
     .member-name { font-weight: 500; font-size: 14px; }
     .member-tz { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .member-raw-name { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
     .member-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .member-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .member-tags .tag-pill { padding: 3px 10px; }
     .role-badge {
       display: inline-block;
       font-size: 10px; font-weight: 600; letter-spacing: .04em;
@@ -506,38 +509,35 @@
     <div class="sidebar-logo">
       <img src="/static/icon-192.png" alt="" width="32" height="32" style="display:block;border-radius:6px;"/>
       <div>
-        <div class="brand">Morgenruf</div>
-        <div class="sub">Dashboard</div>
+        <div class="brand">晨序</div>
+        <div class="sub">控制台</div>
       </div>
     </div>
-    <div class="nav-section">Workspace</div>
+    <div class="nav-section">工作台</div>
     <div class="nav-item active" data-section="standups">
-      <span class="nav-icon">&#9201;</span> Standups
-    </div>
-    <div class="nav-item" data-section="schedules">
-      <span class="nav-icon">&#128197;</span> Schedules
+      <span class="nav-icon">&#9201;</span> 站会
     </div>
     <div class="nav-item" data-section="members">
-      <span class="nav-icon">&#128101;</span> Members
+      <span class="nav-icon">&#128101;</span> 成员
     </div>
     <div class="nav-item" data-section="reports">
-      <span class="nav-icon">&#128202;</span> Reports
+      <span class="nav-icon">&#128202;</span> 汇总
     </div>
     <div class="nav-item" data-section="analytics">
-      <span class="nav-icon">&#128270;</span> Analytics
+      <span class="nav-icon">&#128270;</span> 分析
     </div>
-    <div class="nav-section" style="margin-top:8px">Config</div>
+    <div class="nav-section" style="margin-top:8px">配置</div>
     <div class="nav-item" data-section="settings">
-      <span class="nav-icon">&#9881;</span> Settings
+      <span class="nav-icon">&#9881;</span> 设置
     </div>
     <div class="nav-item" data-section="webhooks">
-      <span class="nav-icon">&#128279;</span> Webhooks
+      <span class="nav-icon">&#128279;</span> Webhook
     </div>
     <div class="nav-item" data-section="kudos">
-      <span class="nav-icon">&#127942;</span> Kudos
+      <span class="nav-icon">&#127942;</span> 表扬
     </div>
     <div class="nav-item" data-section="automation">
-      <span class="nav-icon">&#9889;</span> Automation
+      <span class="nav-icon">&#9889;</span> 自动化
     </div>
     <div class="nav-item" data-section="mcp">
       <span class="nav-icon">&#128299;</span> MCP
@@ -547,7 +547,7 @@
         <div class="ws-avatar" id="ws-avatar">M</div>
         <div>
           <div class="ws-name" id="ws-name">{{ team_name }}</div>
-          <div class="ws-logout"><a href="/dashboard/logout">Sign out</a></div>
+          <div class="ws-logout"><a href="/dashboard/logout">退出</a></div>
         </div>
       </div>
     </div>
@@ -559,37 +559,25 @@
     <div id="section-standups" class="section active">
       <div class="topbar">
         <div>
-          <div class="page-title">Standups</div>
-          <div class="page-subtitle">Manage your team's standup schedules</div>
+          <div class="page-title">站会</div>
+          <div class="page-subtitle">管理每日进度收集和汇总</div>
         </div>
-        <button class="btn btn-primary" onclick="openCreateModal()">&#43; New Standup</button>
+        <button class="btn btn-primary" onclick="openCreateModal()">&#43; 新建站会</button>
       </div>
       <div id="stats-grid" class="stats-grid"></div>
       <div id="standups-list" class="standups-grid"></div>
-    </div>
-
-    <!-- Schedules -->
-    <div id="section-schedules" class="section">
-      <div class="topbar">
-        <div>
-          <div class="page-title">Schedules</div>
-          <div class="page-subtitle">Multiple named standup schedules per workspace</div>
-        </div>
-        <button class="btn btn-primary" onclick="openCreateScheduleModal()">&#43; New Schedule</button>
-      </div>
-      <div id="schedules-list" class="standups-grid"></div>
     </div>
 
     <!-- Members -->
     <div id="section-members" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">Members</div>
-          <div class="page-subtitle">Team members synced from Slack</div>
+          <div class="page-title">成员</div>
+          <div class="page-subtitle">团队成员和控制台权限</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-secondary" onclick="openInviteModal()">+ Invite Admin</button>
-          <button class="btn btn-secondary" onclick="loadMembers()">&#8635; Refresh</button>
+          <button class="btn btn-secondary" onclick="openInviteModal()">+ 添加管理员</button>
+          <button class="btn btn-secondary" onclick="loadMembers()">&#8635; 刷新</button>
         </div>
       </div>
       <div id="members-grid" class="members-grid"></div>
@@ -599,13 +587,13 @@
     <div id="section-reports" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">Reports</div>
-          <div class="page-subtitle">Standup history — filter by date, member, or question</div>
+          <div class="page-title">汇总</div>
+          <div class="page-subtitle">查看历史进度和每日汇总</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-secondary btn-sm" onclick="reportState.dateFrom=dateNDaysAgo(7);reportState.dateTo='';loadReports()">7d</button>
           <button class="btn btn-secondary btn-sm" onclick="reportState.dateFrom=dateNDaysAgo(30);reportState.dateTo='';loadReports()">30d</button>
-          <button class="btn btn-secondary" onclick="exportCSV()">&#8659; Export CSV</button>
+          <button class="btn btn-secondary" onclick="exportCSV()">&#8659; 导出 CSV</button>
         </div>
       </div>
       <div id="reports-content"></div>
@@ -615,12 +603,12 @@
     <div id="section-analytics" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">Analytics</div>
-          <div class="page-subtitle">Per-member participation breakdown</div>
+          <div class="page-title">分析</div>
+          <div class="page-subtitle">成员参与情况</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-secondary btn-sm" onclick="loadAnalytics(7)" id="ana-btn-7" style="opacity:1">7 days</button>
-          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics(30)" id="ana-btn-30">30 days</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadAnalytics(7)" id="ana-btn-7" style="opacity:1">7 天</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadAnalytics(30)" id="ana-btn-30">30 天</button>
         </div>
       </div>
       <div id="analytics-content"></div>
@@ -630,19 +618,19 @@
     <div id="section-settings" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">Settings</div>
-          <div class="page-subtitle">Workspace-level configuration</div>
+          <div class="page-title">设置</div>
+          <div class="page-subtitle">飞书、AI 和控制台配置</div>
         </div>
       </div>
-      <div id="settings-content" style="max-width:520px"></div>
+      <div id="settings-content" style="max-width:760px"></div>
     </div>
 
     <!-- Webhooks -->
     <div id="section-webhooks" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">Webhooks</div>
-          <div class="page-subtitle">Receive POST notifications when standups complete</div>
+          <div class="page-title">Webhook</div>
+          <div class="page-subtitle">站会完成后推送 HTTP 通知</div>
         </div>
       </div>
       <div id="webhooks-content"></div>
@@ -652,22 +640,22 @@
     <div id="section-kudos" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">🏆 Kudos &amp; Recognition</div>
-          <div class="page-subtitle">Celebrate your teammates' great work</div>
+          <div class="page-title">表扬</div>
+          <div class="page-subtitle">记录团队认可</div>
         </div>
       </div>
       <div style="max-width:760px">
         <div class="stat-card" style="margin-bottom:20px">
-          <div class="stat-label" style="margin-bottom:12px">How to give kudos</div>
-          <p style="font-size:0.92rem;color:var(--text-muted)">DM the bot: <code style="background:var(--surface2);padding:2px 7px;border-radius:5px;font-size:0.88rem">kudos @teammate Great work on the deploy! 🚀</code></p>
+          <div class="stat-label" style="margin-bottom:12px">如何表扬</div>
+          <p style="font-size:0.92rem;color:var(--text-muted)">私聊机器人：<code style="background:var(--surface2);padding:2px 7px;border-radius:5px;font-size:0.88rem">kudos @同事 发布做得很好</code></p>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           <div class="stat-card">
-            <div class="stat-label" style="margin-bottom:12px">🥇 Leaderboard — last 30 days</div>
+            <div class="stat-label" style="margin-bottom:12px">最近 30 天排行</div>
             <div id="kudos-board"><div class="loading-center"><div class="spinner"></div></div></div>
           </div>
           <div>
-            <div class="stat-label" style="margin-bottom:12px;padding-left:2px">Recent Kudos</div>
+            <div class="stat-label" style="margin-bottom:12px;padding-left:2px">最近表扬</div>
             <div id="kudos-feed"><div class="loading-center"><div class="spinner"></div></div></div>
           </div>
         </div>
@@ -678,84 +666,82 @@
     <div id="section-automation" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">⚡ Automation</div>
-          <div class="page-subtitle">Configure trigger→action workflow rules</div>
+          <div class="page-title">自动化</div>
+          <div class="page-subtitle">配置触发条件和动作</div>
         </div>
-        <button class="btn btn-primary" onclick="openAddRuleForm()">+ Add Rule</button>
+        <button class="btn btn-primary" onclick="openAddRuleForm()">+ 新建规则</button>
       </div>
       <div style="max-width:760px">
         <div id="rules-list"><div class="loading-center"><div class="spinner"></div></div></div>
 
         <!-- Add Rule form (hidden by default) -->
         <div id="add-rule-form" class="stat-card" style="display:none;margin-top:20px">
-          <div class="stat-label" style="margin-bottom:16px">New Automation Rule</div>
+          <div class="stat-label" style="margin-bottom:16px">新建自动化规则</div>
           <form onsubmit="saveRule(event)" style="display:grid;gap:12px">
             <div>
-              <label style="font-size:0.85rem;color:var(--text-muted)">Rule Name</label>
-              <input id="rule-name" class="input" placeholder="e.g. Alert on blockers" required style="width:100%;margin-top:4px">
+              <label style="font-size:0.85rem;color:var(--text-muted)">规则名称</label>
+              <input id="rule-name" class="input" placeholder="例如：阻塞提醒" required style="width:100%;margin-top:4px">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
-                <label style="font-size:0.85rem;color:var(--text-muted)">Trigger</label>
+                <label style="font-size:0.85rem;color:var(--text-muted)">触发条件</label>
                 <select id="rule-trigger" class="input" onchange="toggleConditionValue()" style="width:100%;margin-top:4px">
-                  <option value="blocker_detected">🚧 Blockers Detected</option>
-                  <option value="low_participation">📉 Low Participation</option>
-                  <option value="standup_complete">✅ Standup Complete</option>
+                  <option value="blocker_detected">发现阻塞</option>
+                  <option value="low_participation">参与率过低</option>
+                  <option value="standup_complete">站会完成</option>
                 </select>
               </div>
               <div id="rule-condition-wrap">
-                <label style="font-size:0.85rem;color:var(--text-muted)">Threshold % (participation)</label>
+                <label style="font-size:0.85rem;color:var(--text-muted)">参与率阈值 %</label>
                 <input id="rule-condition" class="input" type="number" min="0" max="100" placeholder="50" style="width:100%;margin-top:4px">
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div>
-                <label style="font-size:0.85rem;color:var(--text-muted)">Action</label>
+                <label style="font-size:0.85rem;color:var(--text-muted)">动作</label>
                 <select id="rule-action" class="input" style="width:100%;margin-top:4px">
-                  <option value="post_to_channel">📣 Post to Channel</option>
-                  <option value="send_dm">💬 Send DM</option>
-                  <option value="fire_webhook">🔗 Fire Webhook</option>
+                  <option value="post_to_channel">发送到群聊</option>
+                  <option value="send_dm">发送私聊</option>
+                  <option value="fire_webhook">调用 Webhook</option>
                 </select>
               </div>
               <div>
-                <label style="font-size:0.85rem;color:var(--text-muted)">Target (channel ID, user ID, or URL)</label>
-                <input id="rule-target" class="input" placeholder="C0123456 or https://..." required style="width:100%;margin-top:4px">
+                <label style="font-size:0.85rem;color:var(--text-muted)">目标（群 ID、用户 ID 或 URL）</label>
+                <input id="rule-target" class="input" placeholder="oc_xxx 或 https://..." required style="width:100%;margin-top:4px">
               </div>
             </div>
             <div>
-              <label style="font-size:0.85rem;color:var(--text-muted)">Message Template (optional — supports {team}, {trigger}, {blockers}, {participation})</label>
-              <textarea id="rule-message" class="input" rows="2" style="width:100%;margin-top:4px;resize:vertical" placeholder="Leave blank for default message"></textarea>
+              <label style="font-size:0.85rem;color:var(--text-muted)">消息模板（可选，支持 {team}、{trigger}、{blockers}、{participation}）</label>
+              <textarea id="rule-message" class="input" rows="2" style="width:100%;margin-top:4px;resize:vertical" placeholder="留空使用默认消息"></textarea>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end">
-              <button type="button" class="btn btn-secondary" onclick="closeAddRuleForm()">Cancel</button>
-              <button type="submit" class="btn btn-primary">Save Rule</button>
+              <button type="button" class="btn btn-secondary" onclick="closeAddRuleForm()">取消</button>
+              <button type="submit" class="btn btn-primary">保存规则</button>
             </div>
           </form>
         </div>
       </div>
     </div>
-  </div>
-
     <!-- MCP -->
     <div id="section-mcp" class="section">
       <div class="topbar">
         <div>
-          <div class="page-title">🔌 MCP — Connect AI Assistants</div>
-          <div class="page-subtitle">Let Claude, Cursor, and GitHub Copilot query your standup data via <code>https://api.morgenruf.dev/mcp</code></div>
+          <div class="page-title">MCP</div>
+          <div class="page-subtitle">让 AI 助手查询站会数据</div>
         </div>
-        <button class="btn btn-primary" onclick="openCreateKeyModal()">+ Generate New Key</button>
+        <button class="btn btn-primary" onclick="openCreateKeyModal()">+ 生成新密钥</button>
       </div>
       <div style="max-width:800px">
 
         <!-- Keys table -->
         <div class="stat-card" style="margin-bottom:20px">
-          <div class="stat-label" style="margin-bottom:12px">API Keys</div>
+          <div class="stat-label" style="margin-bottom:12px">API 密钥</div>
           <div id="mcp-keys-list"><div class="loading-center"><div class="spinner"></div></div></div>
         </div>
 
         <!-- Config snippets -->
         <div class="stat-card">
-          <div class="stat-label" style="margin-bottom:14px">Client Configuration</div>
+          <div class="stat-label" style="margin-bottom:14px">客户端配置</div>
           <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
             <button class="btn btn-secondary" id="tab-claude" onclick="showMCPTab('claude')" style="font-size:0.82rem">Claude Desktop</button>
             <button class="btn btn-secondary" id="tab-cursor" onclick="showMCPTab('cursor')" style="font-size:0.82rem">Cursor</button>
@@ -764,7 +750,7 @@
           </div>
 
           <div id="mcp-tab-claude">
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Add to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></p>
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">添加到 <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></p>
             <pre id="snippet-claude" style="background:var(--surface2);border-radius:8px;padding:14px;font-size:0.82rem;overflow-x:auto">{
   "mcpServers": {
     "morgenruf": {
@@ -775,11 +761,11 @@
     }
   }
 }</pre>
-            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('claude')">📋 Copy</button>
+            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('claude')">复制</button>
           </div>
 
           <div id="mcp-tab-cursor" style="display:none">
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Add to <code>~/.cursor/mcp.json</code></p>
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">添加到 <code>~/.cursor/mcp.json</code></p>
             <pre id="snippet-cursor" style="background:var(--surface2);border-radius:8px;padding:14px;font-size:0.82rem;overflow-x:auto">{
   "mcpServers": {
     "morgenruf": {
@@ -790,11 +776,11 @@
     }
   }
 }</pre>
-            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('cursor')">📋 Copy</button>
+            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('cursor')">复制</button>
           </div>
 
           <div id="mcp-tab-vscode" style="display:none">
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Add to <code>.vscode/mcp.json</code> (workspace) or user settings</p>
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">添加到 <code>.vscode/mcp.json</code> 或用户设置</p>
             <pre id="snippet-vscode" style="background:var(--surface2);border-radius:8px;padding:14px;font-size:0.82rem;overflow-x:auto">{
   "servers": {
     "morgenruf": {
@@ -806,16 +792,16 @@
     }
   }
 }</pre>
-            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('vscode')">📋 Copy</button>
+            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('vscode')">复制</button>
           </div>
 
           <div id="mcp-tab-http" style="display:none">
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Raw HTTP — useful for testing or custom integrations</p>
+            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">原始 HTTP，用于测试或自定义集成</p>
             <pre id="snippet-http" style="background:var(--surface2);border-radius:8px;padding:14px;font-size:0.82rem;overflow-x:auto">curl -X POST https://api.morgenruf.dev/mcp \
   -H "Authorization: Bearer mrn_YOUR_KEY_HERE" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'</pre>
-            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('http')">📋 Copy</button>
+            <button class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem" onclick="copyConfig('http')">复制</button>
           </div>
         </div>
       </div>
@@ -827,15 +813,15 @@
   <div id="invite-modal" class="modal-overlay" style="display:none">
     <div class="modal-box" style="max-width:420px">
       <div class="modal-header">
-        <div class="modal-title">Invite Admin</div>
+        <div class="modal-title">添加管理员</div>
         <button class="modal-close" onclick="closeInviteModal()">&#10005;</button>
       </div>
       <div style="padding:20px">
         <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">
-          Search for a workspace member and grant them admin access to this dashboard.
+          搜索成员并授予控制台管理员权限。
         </p>
         <div style="position:relative;margin-bottom:12px">
-          <input id="invite-search" type="text" class="form-input" placeholder="Search by name or email..."
+          <input id="invite-search" type="text" class="form-input" placeholder="按姓名或邮箱搜索..."
                  oninput="searchInviteMembers(this.value)" autocomplete="off" />
           <div id="invite-results" style="position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;display:none"></div>
         </div>
@@ -848,8 +834,35 @@
         </div>
         <input id="invite-user-id" type="hidden" />
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="submitInvite()">Grant Admin Access</button>
+          <button class="btn btn-secondary" onclick="closeInviteModal()">取消</button>
+          <button class="btn btn-primary" onclick="submitInvite()">设为管理员</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="member-editor-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box" style="max-width:440px">
+      <div class="modal-header">
+        <div class="modal-title">编辑成员</div>
+        <button class="modal-close" onclick="closeMemberEditor()">&#10005;</button>
+      </div>
+      <div style="padding:20px">
+        <input id="member-editor-id" type="hidden" />
+        <div class="form-group" style="margin-bottom:14px">
+          <label>飞书原始名称</label>
+          <input id="member-editor-raw-name" class="form-input" disabled />
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label>显示名称</label>
+          <input id="member-editor-display-name" class="form-input" placeholder="留空则沿用飞书名称" />
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label>标签</label>
+          <input id="member-editor-tags" class="form-input" placeholder="例如：后端, 负责人, iOS" />
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeMemberEditor()">取消</button>
+          <button class="btn btn-primary" onclick="saveMemberProfile()">保存</button>
         </div>
       </div>
     </div>
@@ -858,33 +871,33 @@
   <div class="modal-overlay" id="mcp-key-modal" style="display:none">
     <div class="modal" style="max-width:440px">
       <div class="modal-header">
-        <div class="modal-title">Generate MCP API Key</div>
+        <div class="modal-title">生成 MCP API 密钥</div>
         <button class="modal-close" onclick="closeMCPKeyModal()">&times;</button>
       </div>
       <div class="modal-body">
         <div id="mcp-key-form-wrap">
           <div class="form-group" style="margin-bottom:16px">
-            <label>Key Name</label>
-            <input id="mcp-key-name" class="input" placeholder="e.g. Claude Desktop" style="width:100%;margin-top:4px">
+            <label>密钥名称</label>
+            <input id="mcp-key-name" class="input" placeholder="例如：Claude Desktop" style="width:100%;margin-top:4px">
           </div>
           <div style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn btn-secondary" onclick="closeMCPKeyModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="createMCPKey()">Generate</button>
+            <button class="btn btn-secondary" onclick="closeMCPKeyModal()">取消</button>
+            <button class="btn btn-primary" onclick="createMCPKey()">生成</button>
           </div>
         </div>
         <div id="mcp-key-result-wrap" style="display:none">
           <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:12px">
-            <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">Your new API key:</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">新的 API 密钥：</div>
             <div style="display:flex;align-items:center;gap:8px">
               <code id="mcp-new-key" style="font-size:0.85rem;word-break:break-all;flex:1"></code>
-              <button class="btn btn-secondary" style="font-size:0.78rem;white-space:nowrap" onclick="copyNewKey()">📋 Copy</button>
+              <button class="btn btn-secondary" style="font-size:0.78rem;white-space:nowrap" onclick="copyNewKey()">复制</button>
             </div>
           </div>
           <div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:10px 14px;font-size:0.83rem;margin-bottom:16px">
-            ⚠️ <strong>Save this key — it won't be shown again!</strong>
+            <strong>请保存这个密钥，关闭后不会再次显示。</strong>
           </div>
           <div style="text-align:right">
-            <button class="btn btn-primary" onclick="closeMCPKeyModal()">Done</button>
+            <button class="btn btn-primary" onclick="closeMCPKeyModal()">完成</button>
           </div>
         </div>
       </div>
@@ -893,251 +906,201 @@
   <div class="modal-overlay" id="standup-modal">
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-title" id="modal-title">New Standup</div>
+        <div class="modal-title" id="modal-title">新建站会</div>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="modal-standup-id"/>
         <div class="form-grid">
           <div class="form-group">
-            <label>Standup Name</label>
-            <input type="text" id="f-name" placeholder="Morning Standup"/>
+            <label>名称</label>
+            <input type="text" id="f-name" placeholder="每日站会"/>
           </div>
           <div class="form-group">
-            <label>Channel</label>
+            <label>群聊</label>
             <select id="f-channel">
-              <option value="">Select a channel...</option>
+              <option value="">选择群聊...</option>
             </select>
           </div>
         </div>
         <div class="form-group">
-          <label>Participants</label>
+          <label>参与成员</label>
           <div class="multi-select-wrap" id="participants-wrap">
             <div class="multi-select-display" id="participants-display" tabindex="0">
-              <span class="placeholder-text">Select participants...</span>
+              <span class="placeholder-text">选择成员...</span>
             </div>
             <div class="multi-dropdown" id="participants-dropdown"></div>
           </div>
         </div>
 
-        <div class="form-section-title">Schedule</div>
+        <div class="form-section-title">调度</div>
         <div class="form-grid">
           <div class="form-group">
-            <label>Time</label>
+            <label>时间</label>
             <input type="time" id="f-time" value="09:00"/>
           </div>
           <div class="form-group">
-            <label>Timezone</label>
+            <label>时区</label>
             <div class="tz-search-wrap" id="tz-search-wrap">
-              <input type="text" id="f-tz" class="tz-search-input" placeholder="Search timezone..." autocomplete="off" value="UTC"/>
+              <input type="text" id="f-tz" class="tz-search-input" placeholder="搜索时区..." autocomplete="off" value="UTC"/>
               <div class="tz-dropdown" id="tz-dropdown"></div>
             </div>
           </div>
         </div>
         <div class="form-group">
-          <label>Days</label>
+          <label>工作日</label>
           <div class="days-grid" id="days-grid">
-            <div class="day-chip selected" data-day="mon">Mon</div>
-            <div class="day-chip selected" data-day="tue">Tue</div>
-            <div class="day-chip selected" data-day="wed">Wed</div>
-            <div class="day-chip selected" data-day="thu">Thu</div>
-            <div class="day-chip selected" data-day="fri">Fri</div>
-            <div class="day-chip" data-day="sat">Sat</div>
-            <div class="day-chip" data-day="sun">Sun</div>
+            <div class="day-chip selected" data-day="mon">周一</div>
+            <div class="day-chip selected" data-day="tue">周二</div>
+            <div class="day-chip selected" data-day="wed">周三</div>
+            <div class="day-chip selected" data-day="thu">周四</div>
+            <div class="day-chip selected" data-day="fri">周五</div>
+            <div class="day-chip" data-day="sat">周六</div>
+            <div class="day-chip" data-day="sun">周日</div>
           </div>
         </div>
 
-        <div class="form-section-title">Questions</div>
+        <div class="form-section-title">问题</div>
         <div style="margin-bottom:10px">
-          <button class="btn btn-ghost btn-sm" type="button" onclick="toggleTemplateGallery()">&#9733; Use a template</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="toggleTemplateGallery()">&#9733; 使用模板</button>
         </div>
         <div id="template-gallery" style="display:none;margin-bottom:12px">
           <div id="template-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;max-height:260px;overflow-y:auto;padding:4px 0"></div>
         </div>
         <div class="questions-list" id="questions-list"></div>
-        <button class="btn-add-q" onclick="addQuestion()">&#43; Add question</button>
+        <button class="btn-add-q" onclick="addQuestion()">&#43; 添加问题</button>
 
-        <div class="form-section-title">Reminder</div>
+        <div class="form-section-title">提醒</div>
         <div class="form-group" style="max-width:260px">
-          <label>Remind participants before standup</label>
+          <label>提前提醒参与成员</label>
           <select id="f-reminder" class="form-input">
-            <option value="0">No reminder</option>
-            <option value="30">30 minutes before</option>
-            <option value="60">1 hour before</option>
-            <option value="120">2 hours before</option>
-            <option value="180">3 hours before</option>
-            <option value="240">4 hours before</option>
-            <option value="480">8 hours before</option>
-            <option value="960">16 hours before</option>
-            <option value="1200">20 hours before</option>
-            <option value="-1">The weekend (~2.5 days)</option>
+            <option value="0">不提醒</option>
+            <option value="30">提前 30 分钟</option>
+            <option value="60">提前 1 小时</option>
+            <option value="120">提前 2 小时</option>
+            <option value="180">提前 3 小时</option>
+            <option value="240">提前 4 小时</option>
+            <option value="480">提前 8 小时</option>
+            <option value="960">提前 16 小时</option>
+            <option value="1200">提前 20 小时</option>
+            <option value="-1">周末前提醒</option>
           </select>
         </div>
 
-        <div class="form-section-title">Report</div>
+        <div class="form-section-title">汇总</div>
         <div class="form-grid">
           <div class="form-group">
-            <label>Report Channel</label>
+            <label>汇总群聊</label>
             <select id="f-report-channel">
-              <option value="">Same as standup channel</option>
+              <option value="">同站会群聊</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Report Time</label>
+            <label>汇总时间</label>
             <input type="time" id="f-report-time"/>
           </div>
         </div>
 
         <!-- Advanced -->
         <div class="accordion-header" onclick="toggleAdvanced()">
-          <h4>Advanced Settings</h4>
+          <h4>高级设置</h4>
           <span class="accordion-arrow" id="adv-arrow">&#8964;</span>
         </div>
         <div class="accordion-body" id="adv-body">
           <div class="form-group">
-            <label class="form-label">Send standup report</label>
+            <label class="form-label">发送汇总方式</label>
             <div style="display:flex;gap:16px;margin-top:4px">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-                <input type="radio" name="f-post-mode" value="channel" id="f-post-channel" checked /> Directly to the channel
+                <input type="radio" name="f-post-mode" value="channel" id="f-post-channel" checked /> 直接发到群里
               </label>
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-                <input type="radio" name="f-post-mode" value="thread" id="f-post-thread" /> As a Slack thread
+                <input type="radio" name="f-post-mode" value="thread" id="f-post-thread" /> 作为线程回复
               </label>
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Notify users when report posts</label>
+            <label class="form-label">汇总发布时提醒成员</label>
             <div id="f-notify-toggle" class="toggle on" onclick="this.classList.toggle('on')"></div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">@mention team members in the report post</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">在汇总中提及团队成员</div>
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label>Group Report By</label>
+              <label>汇总分组</label>
               <select id="f-group-by">
-                <option value="member">Member</option>
-                <option value="question">Question</option>
+                <option value="member">按成员</option>
+                <option value="question">按问题</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Post As</label>
+              <label>发送形式</label>
               <select id="f-post-as">
-                <option value="combined">Combined message</option>
-                <option value="separate">Separate messages</option>
+                <option value="combined">合并消息</option>
+                <option value="separate">分开发送</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Sort Order</label>
+              <label>排序</label>
               <select id="f-sort-order">
-                <option value="chronological">Chronological</option>
-                <option value="alphabetical">Alphabetical</option>
+                <option value="chronological">按提交时间</option>
+                <option value="alphabetical">按姓名</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Edit Window</label>
+              <label>可编辑时间</label>
               <select id="f-edit-window">
-                <option value="report">Until report time</option>
-                <option value="4h">4 hours</option>
-                <option value="none">No limit</option>
+                <option value="report">汇总前</option>
+                <option value="4h">4 小时</option>
+                <option value="none">不限</option>
               </select>
             </div>
           </div>
-          <div class="form-section-title" style="border-top:none;padding-top:0">Integration Autolinks</div>
+          <div class="form-section-title" style="border-top:none;padding-top:0">自动链接</div>
           <div class="form-grid">
             <div class="form-group">
-              <label>Jira Base URL</label>
+              <label>Jira 地址</label>
               <input type="url" id="f-jira" placeholder="https://yourteam.atlassian.net"/>
             </div>
             <div class="form-group">
-              <label>Zendesk Base URL</label>
+              <label>Zendesk 地址</label>
               <input type="url" id="f-zendesk" placeholder="https://yourteam.zendesk.com"/>
             </div>
             <div class="form-group">
-              <label>GitHub Repo (org/repo)</label>
+              <label>GitHub 仓库（org/repo）</label>
               <input type="text" id="f-github-repo" placeholder="org/repo"/>
             </div>
             <div class="form-group">
-              <label>Linear Team Prefix</label>
+              <label>Linear 团队前缀</label>
               <input type="text" id="f-linear-team" placeholder="ENG"/>
             </div>
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:10px">
             <button class="toggle on" id="f-avatar-toggle" onclick="toggleAvatar(this)" type="button"></button>
-            <label style="margin:0;cursor:pointer" onclick="toggleAvatar(document.getElementById('f-avatar-toggle'))">Display member avatar in report</label>
+            <label style="margin:0;cursor:pointer" onclick="toggleAvatar(document.getElementById('f-avatar-toggle'))">在汇总中显示头像</label>
           </div>
-          <div class="form-section-title" style="margin-top:16px">✨ AI Summary</div>
+          <div class="form-section-title" style="margin-top:16px">AI 汇总</div>
           <div class="form-group" style="display:flex;align-items:center;gap:10px">
             <button class="toggle" id="f-ai-summary-toggle" onclick="this.classList.toggle('on')" type="button"></button>
-            <label style="margin:0;cursor:pointer" onclick="document.getElementById('f-ai-summary-toggle').classList.toggle('on')">Enable AI-generated daily summary <span style="color:var(--text-dim)">(requires OPENAI_API_KEY or ANTHROPIC_API_KEY)</span></label>
+            <label style="margin:0;cursor:pointer" onclick="document.getElementById('f-ai-summary-toggle').classList.toggle('on')">启用每日 AI 总结 <span style="color:var(--text-dim)">（在设置页配置 OpenAI、DeepSeek 或 Anthropic Key）</span></label>
           </div>
           <div class="form-group" style="max-width:260px;margin-top:10px">
-            <label>Provider</label>
+            <label>模型服务</label>
             <select id="f-ai-provider">
               <option value="openai">OpenAI gpt-4o-mini</option>
+              <option value="deepseek">DeepSeek deepseek-chat</option>
               <option value="anthropic">Anthropic claude-haiku</option>
             </select>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveStandup()">Save Standup</button>
+        <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveStandup()">保存</button>
       </div>
     </div>
   </div>
 
   <!-- ── Toast container ── -->
   <div id="toast-container"></div>
-
-  <!-- ── MCP Section ── -->
-  <div id="section-mcp" class="section">
-    <div class="topbar">
-      <div>
-        <div class="page-title">🔌 MCP Integration</div>
-        <div class="page-subtitle">Connect AI Assistants — Let Claude, Cursor, and GitHub Copilot query your standup data</div>
-      </div>
-      <a href="https://docs.morgenruf.dev/mcp.html" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">📖 Full Setup Guide</a>
-    </div>
-    <div style="max-width:720px;display:grid;gap:20px;padding-top:4px">
-
-      <!-- Team ID box -->
-      <div class="stat-card">
-        <div class="stat-label" style="margin-bottom:12px">Your Team ID</div>
-        <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-family:monospace;font-size:14px">
-          <code id="mcp-team-id" style="flex:1;background:none;border:none;padding:0;color:var(--text);font-size:14px">Loading…</code>
-          <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('mcp-team-id')">Copy</button>
-        </div>
-        <p style="font-size:12px;color:var(--text-dim);margin-top:8px">Use this as <code style="font-size:11px">MCP_TEAM_ID</code> in your AI assistant config</p>
-      </div>
-
-      <!-- Config generator -->
-      <div class="stat-card">
-        <div class="stat-label" style="margin-bottom:12px">Config Generator</div>
-        <div style="margin-bottom:12px">
-          <label style="font-size:12px;font-weight:500;color:var(--text-muted);display:block;margin-bottom:6px">AI Assistant</label>
-          <select id="mcp-assistant" onchange="renderMCPConfig()" style="width:240px">
-            <option value="claude">Claude Desktop</option>
-            <option value="cursor">Cursor</option>
-            <option value="copilot">GitHub Copilot</option>
-          </select>
-        </div>
-        <div style="position:relative">
-          <pre id="mcp-config-output" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px;font-size:12px;font-family:monospace;color:var(--text);white-space:pre;overflow-x:auto;margin:0;line-height:1.6"></pre>
-          <button onclick="copyMCPConfig()" style="position:absolute;top:10px;right:10px" class="btn btn-secondary btn-sm">Copy</button>
-        </div>
-        <div style="margin-top:10px">
-          <label style="font-size:12px;color:var(--text-dim);margin-bottom:4px;display:block">Config file location:</label>
-          <code id="mcp-config-path" style="font-size:12px;color:var(--text-muted)"></code>
-        </div>
-      </div>
-
-      <!-- Links -->
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <a href="https://docs.morgenruf.dev/mcp.html" target="_blank" rel="noopener" class="btn btn-secondary">📖 Full MCP Setup Guide</a>
-        <a href="https://docs.morgenruf.dev/mcp.html#available-tools" target="_blank" rel="noopener" class="btn btn-ghost">🛠 View All 8 Tools</a>
-      </div>
-
-    </div>
-  </div>
 
   <script>
   // ── State ──
@@ -1146,7 +1109,9 @@
     standups: [],
     schedules: [],
     members: [],
+    editingMemberId: '',
     channels: [],
+    feishuDiscoveryError: '',
     stats: {},
     webhooks: [],
     participants: [],
@@ -1174,7 +1139,6 @@
       if (sec === 'settings') loadSettings();
       if (sec === 'webhooks') loadWebhooks();
       if (sec === 'analytics') loadAnalytics(7);
-      if (sec === 'schedules') loadSchedules();
       if (sec === 'kudos') loadKudos();
       if (sec === 'automation') loadRules();
       if (sec === 'mcp') loadMCPKeys();
@@ -1187,7 +1151,7 @@
 
   // ── API helpers ──
   function checkAuth(res) {
-    if (res.status === 401) { window.location.href = '/dashboard/login'; throw new Error('Session expired'); }
+    if (res.status === 401) { window.location.href = '/dashboard/login'; throw new Error('登录已过期'); }
     return res;
   }
 
@@ -1197,7 +1161,7 @@
     const res = await fetch('/dashboard/api' + path, opts);
     if (res.status === 401) {
       window.location.href = '/dashboard/login';
-      throw new Error('Session expired');
+      throw new Error('登录已过期');
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -1224,7 +1188,7 @@
       const m = state.members.find(x => x.id === userId);
       if (m) m.role = role;
       renderMembers();
-      toast('Role updated to ' + role);
+      toast(role === 'admin' ? '已设为管理员' : '已设为成员');
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -1255,7 +1219,7 @@
     const circ = 2 * Math.PI * 28;
     const dash = circ * (rate / 100);
     document.getElementById('stats-grid').innerHTML =
-      '<div class="stat-card"><div class="stat-label">Completion Rate</div>' +
+      '<div class="stat-card"><div class="stat-label">完成率</div>' +
       '<div style="display:flex;align-items:center;gap:16px">' +
       '<div class="gauge-wrap">' +
       '<svg width="80" height="80" viewBox="0 0 64 64">' +
@@ -1264,15 +1228,15 @@
       ' stroke-dasharray="' + dash.toFixed(1) + ' ' + (circ - dash).toFixed(1) + '"' +
       ' stroke-linecap="round"/></svg>' +
       '<div class="gauge-num">' + rate + '%</div></div>' +
-      '<div><div class="stat-sub">Last 7 days</div></div></div></div>' +
+      '<div><div class="stat-sub">最近 7 天</div></div></div></div>' +
 
-      '<div class="stat-card"><div class="stat-label">Active Members</div>' +
+      '<div class="stat-card"><div class="stat-label">活跃成员</div>' +
       '<div class="stat-value">' + (s.active_members || 0) + '</div>' +
-      '<div class="stat-sub">responded this week</div></div>' +
+      '<div class="stat-sub">本周已提交</div></div>' +
 
-      '<div class="stat-card"><div class="stat-label">Responses This Week</div>' +
+      '<div class="stat-card"><div class="stat-label">本周提交</div>' +
       '<div class="stat-value">' + (s.total_responses || 0) + '</div>' +
-      '<div class="stat-sub">total submissions</div></div>';
+      '<div class="stat-sub">累计提交</div></div>';
   }
 
   // ── Standups ──
@@ -1283,29 +1247,29 @@
       state.standups = await api('GET', '/standups');
       renderStandups();
     } catch (e) {
-      document.getElementById('standups-list').innerHTML = '<p style="color:var(--text-dim);padding:24px">Failed to load standups.</p>';
+      document.getElementById('standups-list').innerHTML = '<p style="color:var(--text-dim);padding:24px">站会加载失败。</p>';
     }
   }
 
   function renderStandups() {
     const el = document.getElementById('standups-list');
     if (!state.standups.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#9201;</div><h3>No standups yet</h3><p>Create your first standup to get your team going.</p><button class="btn btn-primary" onclick="openCreateModal()">&#43; New Standup</button></div>';
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#9201;</div><h3>还没有站会</h3><p>创建一个站会开始收集团队进度。</p><button class="btn btn-primary" onclick="openCreateModal()">&#43; 新建站会</button></div>';
       return;
     }
     const sorted = [...state.standups].sort((a, b) => {
-      const nameA = (a.name || 'Morning Standup').toLowerCase();
-      const nameB = (b.name || 'Morning Standup').toLowerCase();
+      const nameA = (a.name || '每日站会').toLowerCase();
+      const nameB = (b.name || '每日站会').toLowerCase();
       return nameA.localeCompare(nameB);
     });
     el.innerHTML = sorted.map(s => {
       const chName = channelName(s.channel_id);
       const dayChips = (s.schedule_days || []).map(d => '<span class="day-chip">' + esc(d) + '</span>').join('');
-      const badge = s.active ? '<span class="badge-active">Active</span>' : '<span class="badge-paused">Paused</span>';
+      const badge = s.active ? '<span class="badge-active">启用</span>' : '<span class="badge-paused">暂停</span>';
       return '<div class="standup-card" id="sc-' + s.id + '">' +
         '<div class="standup-icon">&#9201;</div>' +
         '<div class="standup-info">' +
-        '<div class="standup-name">' + esc(s.name || 'Morning Standup') + '</div>' +
+        '<div class="standup-name">' + esc(s.name || '每日站会') + '</div>' +
         '<div class="standup-meta">' +
         '<span>#' + esc(chName) + '</span>' +
         '<span>' + esc(s.schedule_time || '09:00') + ' ' + esc(s.schedule_tz || 'UTC') + '</span>' +
@@ -1313,9 +1277,9 @@
         badge +
         '</div></div>' +
         '<div class="standup-actions">' +
-        '<button class="toggle ' + (s.active ? 'on' : '') + '" onclick="toggleStandup(' + s.id + ', this)" title="Toggle active"></button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="openEditModal(' + s.id + ')">Edit</button>' +
-        '<button class="btn btn-danger btn-sm" onclick="deleteStandup(' + s.id + ')">Delete</button>' +
+        '<button class="toggle ' + (s.active ? 'on' : '') + '" onclick="toggleStandup(' + s.id + ', this)" title="启用/暂停"></button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditModal(' + s.id + ')">编辑</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteStandup(' + s.id + ')">删除</button>' +
         '</div></div>';
     }).join('');
   }
@@ -1329,17 +1293,17 @@
       standup.active = newActive;
       btn.classList.toggle('on', newActive);
       renderStandups();
-      toast(newActive ? 'Standup activated' : 'Standup paused');
+      toast(newActive ? '站会已启用' : '站会已暂停');
     } catch (e) { toast(e.message, 'error'); }
   }
 
   async function deleteStandup(id) {
-    if (!confirm('Delete this standup? This cannot be undone.')) return;
+    if (!confirm('确定删除这个站会吗？此操作不可恢复。')) return;
     try {
       await api('DELETE', '/standups/' + id);
       state.standups = state.standups.filter(s => s.id !== id);
       renderStandups();
-      toast('Standup deleted');
+      toast('站会已删除');
     } catch (e) { toast(e.message, 'error'); }
   }
 
@@ -1347,7 +1311,11 @@
   async function loadChannels() {
     try {
       state.channels = await api('GET', '/channels');
-    } catch (e) { state.channels = []; }
+      state.feishuDiscoveryError = '';
+    } catch (e) {
+      state.channels = [];
+      state.feishuDiscoveryError = e.message || '群聊拉取失败';
+    }
     populateChannelSelects();
   }
 
@@ -1355,14 +1323,14 @@
     ['f-channel', 'f-report-channel'].forEach(id => {
       const sel = document.getElementById(id);
       if (!sel) return;
-      const placeholder = id === 'f-report-channel' ? '<option value="">Same as standup channel</option>' : '<option value="">Select a channel...</option>';
+      const placeholder = id === 'f-report-channel' ? '<option value="">同站会群聊</option>' : '<option value="">选择群聊...</option>';
       sel.innerHTML = placeholder + state.channels.map(c => '<option value="' + esc(c.id) + '">#' + esc(c.name) + '</option>').join('');
     });
   }
 
   function channelName(id) {
     const c = state.channels.find(c => c.id === id);
-    return c ? c.name : (id || 'unknown');
+    return c ? c.name : (id || '未知');
   }
 
   // ── Members ──
@@ -1374,14 +1342,14 @@
       renderMembers();
       populateParticipantsDropdown();
     } catch (e) {
-      document.getElementById('members-grid').innerHTML = '<p style="color:var(--text-dim);padding:24px">Failed to load members.</p>';
+      document.getElementById('members-grid').innerHTML = '<p style="color:var(--text-dim);padding:24px">成员加载失败。</p>';
     }
   }
 
   function renderMembers() {
     const el = document.getElementById('members-grid');
     if (!state.members.length) {
-      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">No members found.</p>';
+      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">没有找到成员。</p>';
       return;
     }
     el.innerHTML = state.members.map(m => {
@@ -1391,19 +1359,66 @@
         : '<div class="avatar-initials">' + esc(initials) + '</div>';
       const role = m.role || 'member';
       const badgeHtml = role === 'admin'
-        ? '<span class="role-badge">Admin</span>'
-        : '<span class="role-badge member">Member</span>';
+        ? '<span class="role-badge">管理员</span>'
+        : '<span class="role-badge member">成员</span>';
       let roleBtn = '';
+      let editBtn = '';
       if (window._myRole === 'admin' && m.id !== window._myUserId) {
         roleBtn = role === 'admin'
-          ? '<button class="btn-role" onclick="setRole(\'' + esc(m.id) + '\',\'member\')">Make Member</button>'
-          : '<button class="btn-role" onclick="setRole(\'' + esc(m.id) + '\',\'admin\')">Make Admin</button>';
+          ? '<button class="btn-role" onclick="setRole(\'' + esc(m.id) + '\',\'member\')">设为成员</button>'
+          : '<button class="btn-role" onclick="setRole(\'' + esc(m.id) + '\',\'admin\')">设为管理员</button>';
+        editBtn = '<button class="btn-role" onclick="openMemberEditor(\'' + esc(m.id) + '\')">编辑</button>';
       }
+      const rawName = (m.raw_name && m.raw_name !== (m.name || m.display_name || m.id))
+        ? '<div class="member-raw-name">' + esc(m.raw_name) + '</div>'
+        : '';
+      const tagsHtml = (m.tags || []).length
+        ? '<div class="member-tags">' + m.tags.map(tag => '<span class="tag-pill">' + esc(tag) + '</span>').join('') + '</div>'
+        : '';
       return '<div class="member-card">' + avatarHtml +
         '<div class="member-info"><div class="member-name">' + esc(m.name || m.display_name || m.id) + '</div>' +
+        rawName +
         '<div class="member-tz">' + esc(m.tz || 'UTC') + '</div>' +
-        '<div class="member-meta">' + badgeHtml + roleBtn + '</div></div></div>';
+        tagsHtml +
+        '<div class="member-meta">' + badgeHtml + editBtn + roleBtn + '</div></div></div>';
     }).join('');
+  }
+
+  function openMemberEditor(userId) {
+    const member = (state.members || []).find(m => m.id === userId);
+    if (!member) return;
+    state.editingMemberId = userId;
+    document.getElementById('member-editor-id').value = userId;
+    document.getElementById('member-editor-raw-name').value = member.raw_name || member.name || member.id;
+    document.getElementById('member-editor-display-name').value = member.raw_name !== member.name ? (member.name || '') : '';
+    document.getElementById('member-editor-tags').value = (member.tags || []).join(', ');
+    document.getElementById('member-editor-modal').style.display = 'flex';
+  }
+
+  function closeMemberEditor() {
+    state.editingMemberId = '';
+    document.getElementById('member-editor-modal').style.display = 'none';
+  }
+
+  async function saveMemberProfile() {
+    const userId = document.getElementById('member-editor-id').value;
+    if (!userId) return;
+    const displayName = document.getElementById('member-editor-display-name').value.trim();
+    const tags = document.getElementById('member-editor-tags').value
+      .split(/[,，]/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    try {
+      await api('PUT', '/members/' + encodeURIComponent(userId), {
+        display_name_override: displayName,
+        tags
+      });
+      toast('成员信息已保存');
+      closeMemberEditor();
+      await loadMembers();
+    } catch (e) {
+      toast(e.message || '保存失败', 'error');
+    }
   }
 
   function openInviteModal() {
@@ -1449,10 +1464,10 @@
   }
   async function submitInvite() {
     const user_id = document.getElementById('invite-user-id').value;
-    if (!user_id) { toast('Please select a member first', 'error'); return; }
+    if (!user_id) { toast('请先选择成员', 'error'); return; }
     try {
       await api('POST', '/members/invite', { user_id, role: 'admin' });
-      toast('Admin access granted!');
+      toast('已授予管理员权限');
       closeInviteModal();
       loadMembers();
     } catch(e) { toast(e.message, 'error'); }
@@ -1512,7 +1527,7 @@
 
       const byDate = {};
       for (const s of standups) {
-        const d = s.standup_date || s.submitted_at?.slice(0, 10) || 'Unknown';
+        const d = s.standup_date || s.submitted_at?.slice(0, 10) || '未知日期';
         if (!byDate[d]) byDate[d] = [];
         byDate[d].push(s);
       }
@@ -1523,9 +1538,9 @@
           <tr>
             <td style="width:180px;vertical-align:top;padding:8px 12px;font-weight:500">${avatarHtml(s.user_id, 28)}${esc(resolveName(s.user_id, s.user_name))}</td>
             <td style="padding:8px 12px">
-              ${s.yesterday ? `<div style="margin-bottom:4px"><span style="font-weight:600;font-size:12px">Yesterday:</span> ${esc(s.yesterday)}</div>` : ''}
-              ${s.today ? `<div style="margin-bottom:4px"><span style="font-weight:600;font-size:12px">Today:</span> ${esc(s.today)}</div>` : ''}
-              ${s.blockers && s.blockers.toLowerCase() !== 'none' ? `<div style="color:var(--danger)"><span style="font-weight:600;font-size:12px">🚧 Blockers:</span> ${esc(s.blockers)}</div>` : ''}
+              ${s.yesterday ? `<div style="margin-bottom:4px"><span style="font-weight:600;font-size:12px">昨天：</span> ${esc(s.yesterday)}</div>` : ''}
+              ${s.today ? `<div style="margin-bottom:4px"><span style="font-weight:600;font-size:12px">今天：</span> ${esc(s.today)}</div>` : ''}
+              ${s.blockers && s.blockers.toLowerCase() !== 'none' ? `<div style="color:var(--danger)"><span style="font-weight:600;font-size:12px">阻塞：</span> ${esc(s.blockers)}</div>` : ''}
             </td>
           </tr>
         `).join('')}
@@ -1535,33 +1550,33 @@
         <!-- Filter bar -->
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
           <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:12px;color:var(--text-muted)">From</span>
+            <span style="font-size:12px;color:var(--text-muted)">从</span>
             <input type="date" class="form-input" style="width:150px;padding:6px 10px;font-size:13px"
                    value="${reportState.dateFrom}" onchange="reportState.dateFrom=this.value;loadReports()"/>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:12px;color:var(--text-muted)">To</span>
+            <span style="font-size:12px;color:var(--text-muted)">到</span>
             <input type="date" class="form-input" style="width:150px;padding:6px 10px;font-size:13px"
                    value="${reportState.dateTo}" onchange="reportState.dateTo=this.value;loadReports()"/>
           </div>
           <select class="form-input" style="width:180px;padding:6px 10px;font-size:13px"
                   onchange="reportState.userId=this.value;loadReports()">
-            <option value="">All members</option>
+            <option value="">全部成员</option>
             ${memberOptions}
           </select>
           <button class="btn btn-secondary" style="padding:6px 12px;font-size:12px"
-                  onclick="reportState={dateFrom:'',dateTo:'',userId:''};loadReports()">Reset</button>
+                  onclick="reportState={dateFrom:'',dateTo:'',userId:''};loadReports()">重置</button>
         </div>
 
         <!-- Participation summary -->
         ${participation.length ? `
         <div class="stat-card" style="margin-bottom:20px">
-          <div class="stat-label" style="margin-bottom:12px">Participation — last ${total_days} days</div>
+          <div class="stat-label" style="margin-bottom:12px">参与情况 - 最近 ${total_days} 天</div>
           <table style="width:100%;border-collapse:collapse">
             <thead><tr>
-              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">Name</th>
-              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">Participation</th>
-              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">Recently Completed</th>
+              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">姓名</th>
+              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">参与</th>
+              <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--text-muted);font-weight:500">近期完成</th>
             </tr></thead>
             <tbody>${participationRows}</tbody>
           </table>
@@ -1569,19 +1584,19 @@
 
         <!-- Response history -->
         <div class="stat-card">
-          <div class="stat-label" style="margin-bottom:12px">Standup Responses</div>
+          <div class="stat-label" style="margin-bottom:12px">站会回复</div>
           ${standups.length ? `
           <table style="width:100%;border-collapse:collapse">
             <thead><tr>
-              <th style="text-align:left;padding:6px 12px;font-size:12px;color:var(--text-muted);font-weight:500;width:140px">Member</th>
-              <th style="text-align:left;padding:6px 12px;font-size:12px;color:var(--text-muted);font-weight:500">Response</th>
+              <th style="text-align:left;padding:6px 12px;font-size:12px;color:var(--text-muted);font-weight:500;width:140px">成员</th>
+              <th style="text-align:left;padding:6px 12px;font-size:12px;color:var(--text-muted);font-weight:500">回复</th>
             </tr></thead>
             <tbody>${responseRows}</tbody>
-          </table>` : '<p style="color:var(--text-muted);padding:12px 0;font-size:13px">No responses found for the selected filters.</p>'}
+          </table>` : '<p style="color:var(--text-muted);padding:12px 0;font-size:13px">当前筛选条件下没有回复。</p>'}
         </div>
       `;
     } catch (e) {
-      el.innerHTML = '<p style="color:var(--text-muted);padding:24px">Failed to load reports.</p>';
+      el.innerHTML = '<p style="color:var(--text-muted);padding:24px">汇总加载失败。</p>';
     }
   }
 
@@ -1590,23 +1605,265 @@
     const el = document.getElementById('settings-content');
     el.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
     try {
-      const standups = await api('GET', '/standups');
+      const [settings, standups] = await Promise.all([
+        api('GET', '/settings'),
+        api('GET', '/standups')
+      ]);
+      const values = settings.values || {};
+      const hasFeishuCreds = Boolean(values.FEISHU_APP_ID || (settings.secret_set || {}).FEISHU_APP_SECRET);
+      if (hasFeishuCreds) {
+        await loadChannels();
+        const defaultChatId = values.FEISHU_DEFAULT_CHAT_ID || (state.channels[0] && state.channels[0].id) || '';
+        if (defaultChatId) {
+          try {
+            state.members = await api('GET', '/members?channel_id=' + encodeURIComponent(defaultChatId));
+          } catch (e) {
+            state.members = [];
+            state.feishuDiscoveryError = e.message || '成员同步失败';
+          }
+        } else {
+          state.members = [];
+        }
+      } else {
+        state.channels = [];
+        state.members = [];
+        state.feishuDiscoveryError = '';
+      }
+      el.innerHTML = renderAppSettings(settings) +
+        '<div id="standup-settings-section"></div>' +
+        '<div id="feed-section"></div>' +
+        '<div id="digest-section" style="margin-top:0"></div>';
+
+      const standupWrap = document.getElementById('standup-settings-section');
       if (standups.length) {
         const s = standups[0];
-        el.innerHTML = '<div class="standup-card" style="flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:16px">' +
-          '<div style="font-weight:600;font-size:15px">Primary Standup Config</div>' +
-          '<div class="standup-meta"><span>Channel: #' + esc(channelName(s.channel_id)) + '</span><span>Time: ' + esc(s.schedule_time) + ' ' + esc(s.schedule_tz) + '</span></div>' +
-          '<button class="btn btn-secondary btn-sm" onclick="openEditModal(' + s.id + '); switchSection(&quot;standups&quot;)">Edit Configuration</button>' +
-          '</div>' +
-          '<div id="feed-section"></div>' +
-          '<div id="digest-section" style="margin-top:0"></div>';
+        standupWrap.innerHTML = '<div class="standup-card" style="flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:16px">' +
+          '<div style="font-weight:600;font-size:15px">默认站会</div>' +
+          '<div class="standup-meta"><span>群聊：#' + esc(channelName(s.channel_id)) + '</span><span>时间：' + esc(s.schedule_time) + ' ' + esc(s.schedule_tz) + '</span></div>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openEditModal(' + s.id + '); switchSection(&quot;standups&quot;)">编辑站会配置</button>' +
+          '</div>';
         loadFeedSettings(s);
         loadDigestSettings(s);
       } else {
-        el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#9881;</div><h3>No configuration yet</h3><p>Create a standup to configure your workspace.</p><button class="btn btn-primary" onclick="openCreateModal(); switchSection(&quot;standups&quot;)">&#43; New Standup</button></div>';
+        standupWrap.innerHTML = '<div class="empty-state"><div class="empty-icon">&#9881;</div><h3>还没有站会</h3><p>创建站会后即可配置自动收集和汇总。</p><button class="btn btn-primary" onclick="openCreateModal(); switchSection(&quot;standups&quot;)">&#43; 新建站会</button></div>';
       }
     } catch (e) {
-      el.innerHTML = '<p style="color:var(--text-dim)">Failed to load settings.</p>';
+      el.innerHTML = '<p style="color:var(--text-dim)">设置加载失败。</p>';
+    }
+  }
+
+  function feishuStatusText(v, secret) {
+    const hasCreds = Boolean(v.FEISHU_APP_ID || secret.FEISHU_APP_SECRET);
+    const placeholderOnly = state.channels.length === 1 && state.channels[0] && state.channels[0].id === 'oc_demo' && state.channels[0].name === 'oc_demo';
+    if (!hasCreds) return '先填写 App ID 和 App Secret，然后点击“连接飞书”。';
+    if (state.feishuDiscoveryError) return '飞书连接失败：' + state.feishuDiscoveryError;
+    if (state.channels.length && !placeholderOnly) return '已连接飞书。现在可以直接选择群聊和管理员。';
+    return '凭证已保存，但当前应用还看不到任何群聊。先把机器人拉进目标群，再点“重新拉取群聊”。';
+  }
+
+  function renderFeishuChatOptions(selectedId) {
+    const options = [];
+    options.push('<option value="">' + (state.channels.length ? '选择默认群聊...' : '先连接飞书并拉取群聊') + '</option>');
+    (state.channels || []).forEach(c => {
+      options.push('<option value="' + esc(c.id) + '" ' + (c.id === selectedId ? 'selected' : '') + '>#' + esc(c.name || c.id) + '</option>');
+    });
+    if (selectedId && !(state.channels || []).some(c => c.id === selectedId)) {
+      options.push('<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + '</option>');
+    }
+    return options.join('');
+  }
+
+  function renderFeishuMemberOptions(selectedId) {
+    const options = ['<option value="">选择管理员...</option>'];
+    (state.members || []).forEach(m => {
+      const name = m.name || m.display_name || m.id;
+      options.push('<option value="' + esc(m.id) + '" ' + (m.id === selectedId ? 'selected' : '') + '>' + esc(name) + '</option>');
+    });
+    if (selectedId && !(state.members || []).some(m => m.id === selectedId)) {
+      options.push('<option value="' + esc(selectedId) + '" selected>' + esc(selectedId) + '</option>');
+    }
+    return options.join('');
+  }
+
+  function renderAppSettings(payload) {
+    const v = payload.values || {};
+    const secret = payload.secret_set || {};
+    const input = (key, label, placeholder = '', type = 'text') =>
+      '<div><label style="font-size:12px;color:var(--text-muted)">' + label + '</label>' +
+      '<input id="set-' + key + '" class="input" type="' + type + '" placeholder="' + esc(placeholder) + '" value="' + esc(v[key] || '') + '" style="margin-top:4px;width:100%"></div>';
+    const area = (key, label, placeholder = '') =>
+      '<div><label style="font-size:12px;color:var(--text-muted)">' + label + '</label>' +
+      '<textarea id="set-' + key + '" class="input" rows="3" placeholder="' + esc(placeholder) + '" style="margin-top:4px;width:100%;resize:vertical">' + esc(v[key] || '') + '</textarea></div>';
+    const secretInput = (key, label) =>
+      '<div><label style="font-size:12px;color:var(--text-muted)">' + label + '</label>' +
+      '<input id="set-' + key + '" class="input" type="password" placeholder="' + (secret[key] ? '已配置，留空不变' : '未配置') + '" style="margin-top:4px;width:100%"></div>';
+    const auth = v.DASHBOARD_AUTH || 'none';
+    const aiEnabled = String(v.FEISHU_AI_SUMMARY_ENABLED || 'false') === 'true';
+    const statusText = feishuStatusText(v, secret);
+    return '<div class="stat-card" style="margin-bottom:16px">' +
+      '<div style="font-weight:600;font-size:15px;margin-bottom:12px">系统设置</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        input('APP_URL', '公开访问地址', 'https://example.trycloudflare.com') +
+        '<div><label style="font-size:12px;color:var(--text-muted)">控制台访问方式</label>' +
+          '<select id="set-DASHBOARD_AUTH" class="input" style="margin-top:4px;width:100%">' +
+            '<option value="none" ' + (auth === 'none' ? 'selected' : '') + '>内部直进</option>' +
+            '<option value="key" ' + (auth === 'key' ? 'selected' : '') + '>访问密钥</option>' +
+          '</select></div>' +
+        secretInput('DASHBOARD_ADMIN_KEY', '控制台访问密钥') +
+      '</div>' +
+      '<div style="font-weight:600;font-size:15px;margin:18px 0 12px">飞书机器人</div>' +
+      '<div class="standup-card" style="flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:12px;padding:14px 16px">' +
+        '<div style="font-size:13px;color:var(--text-muted)">连接状态</div>' +
+        '<div style="font-size:14px;line-height:1.5">' + esc(statusText) + '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-primary btn-sm" type="button" onclick="connectFeishuSettings()">连接飞书</button>' +
+          '<button class="btn btn-secondary btn-sm" type="button" onclick="refreshFeishuDiscovery()">重新拉取群聊</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:12px;color:var(--text-muted)">事件接收方式</label>' +
+          '<select id="set-FEISHU_EVENT_MODE" class="input" style="margin-top:4px;width:100%">' +
+            '<option value="ws" ' + ((v.FEISHU_EVENT_MODE || 'ws') === 'ws' ? 'selected' : '') + '>长连接</option>' +
+            '<option value="webhook" ' + (v.FEISHU_EVENT_MODE === 'webhook' ? 'selected' : '') + '>公网回调</option>' +
+          '</select></div>' +
+        input('FEISHU_APP_ID', 'App ID', 'cli_xxx') +
+        secretInput('FEISHU_APP_SECRET', 'App Secret') +
+        input('FEISHU_TEAM_NAME', '工作区名称', '飞书工作区') +
+        input('FEISHU_SCHEDULE_TIME', '默认收集时间', '09:30', 'time') +
+        input('FEISHU_SCHEDULE_TZ', '默认时区', 'Asia/Shanghai') +
+        input('FEISHU_SCHEDULE_DAYS', '默认工作日', 'mon,tue,wed,thu,fri') +
+        '<div><label style="font-size:12px;color:var(--text-muted)">默认 AI 汇总</label>' +
+          '<select id="set-FEISHU_AI_SUMMARY_ENABLED" class="input" style="margin-top:4px;width:100%">' +
+            '<option value="false" ' + (!aiEnabled ? 'selected' : '') + '>关闭</option>' +
+            '<option value="true" ' + (aiEnabled ? 'selected' : '') + '>开启</option>' +
+          '</select></div>' +
+        '<div><label style="font-size:12px;color:var(--text-muted)">AI 服务</label>' +
+          '<select id="set-FEISHU_AI_PROVIDER" class="input" style="margin-top:4px;width:100%">' +
+            '<option value="openai" ' + ((v.FEISHU_AI_PROVIDER || 'openai') === 'openai' ? 'selected' : '') + '>OpenAI</option>' +
+            '<option value="deepseek" ' + (v.FEISHU_AI_PROVIDER === 'deepseek' ? 'selected' : '') + '>DeepSeek</option>' +
+            '<option value="anthropic" ' + (v.FEISHU_AI_PROVIDER === 'anthropic' ? 'selected' : '') + '>Anthropic</option>' +
+          '</select></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">' +
+        '<div><label style="font-size:12px;color:var(--text-muted)">默认群聊</label>' +
+          '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">' +
+            '<select id="set-FEISHU_DEFAULT_CHAT_ID" class="input" style="width:100%" onchange="refreshFeishuMembers(this.value)">' +
+              renderFeishuChatOptions(v.FEISHU_DEFAULT_CHAT_ID || '') +
+            '</select>' +
+          '</div></div>' +
+        '<div><label style="font-size:12px;color:var(--text-muted)">管理员</label>' +
+          '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">' +
+            '<select id="set-FEISHU_ADMIN_OPEN_ID" class="input" style="width:100%">' +
+              renderFeishuMemberOptions(v.FEISHU_ADMIN_OPEN_ID || '') +
+            '</select>' +
+            '<button class="btn btn-secondary btn-sm" type="button" onclick="refreshFeishuMembers()">同步成员</button>' +
+          '</div></div>' +
+      '</div>' +
+      '<details style="margin-top:14px">' +
+        '<summary style="cursor:pointer;color:var(--text-muted);font-size:13px">高级配置</summary>' +
+        '<div style="display:grid;gap:12px;margin-top:12px">' +
+          input('FEISHU_TEAM_ID', '工作区 ID', 'feishu') +
+          secretInput('FEISHU_VERIFICATION_TOKEN', '事件校验 Token（仅 webhook 模式）') +
+          area('FEISHU_QUESTIONS_JSON', '默认问题 JSON', '["昨天完成了什么？","今天计划做什么？","有什么阻塞？"]') +
+        '</div>' +
+      '</details>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:16px">' +
+        '<button class="btn btn-primary" onclick="saveAppSettings()">保存设置</button>' +
+      '</div>' +
+      '<div style="font-weight:600;font-size:15px;margin:18px 0 12px">AI Key</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        secretInput('OPENAI_API_KEY', 'OpenAI API Key') +
+        secretInput('DEEPSEEK_API_KEY', 'DeepSeek API Key') +
+        secretInput('ANTHROPIC_API_KEY', 'Anthropic API Key') +
+        input('DEEPSEEK_BASE_URL', 'DeepSeek Base URL', 'https://api.deepseek.com') +
+        input('DEEPSEEK_MODEL', 'DeepSeek 模型', 'deepseek-chat') +
+      '</div>' +
+    '</div>';
+  }
+
+  function collectAppSettings() {
+    const keys = [
+      'APP_URL','DASHBOARD_AUTH','FEISHU_EVENT_MODE','FEISHU_APP_ID','FEISHU_TEAM_ID','FEISHU_TEAM_NAME','FEISHU_ADMIN_OPEN_ID',
+      'FEISHU_DEFAULT_CHAT_ID','FEISHU_DEFAULT_CHAT_NAME','FEISHU_SCHEDULE_TIME','FEISHU_SCHEDULE_TZ',
+      'FEISHU_SCHEDULE_DAYS','FEISHU_AI_SUMMARY_ENABLED','FEISHU_AI_PROVIDER','FEISHU_CHANNELS',
+      'FEISHU_STANDUP_MEMBERS','FEISHU_QUESTIONS_JSON','DEEPSEEK_BASE_URL','DEEPSEEK_MODEL'
+    ];
+    const secretKeys = ['DASHBOARD_ADMIN_KEY','FEISHU_APP_SECRET','FEISHU_VERIFICATION_TOKEN','OPENAI_API_KEY','DEEPSEEK_API_KEY','ANTHROPIC_API_KEY'];
+    const settings = {};
+    keys.forEach(key => {
+      const el = document.getElementById('set-' + key);
+      if (el) settings[key] = el.value;
+    });
+    secretKeys.forEach(key => {
+      const el = document.getElementById('set-' + key);
+      if (el && el.value.trim()) settings[key] = el.value.trim();
+    });
+    const chatSel = document.getElementById('set-FEISHU_DEFAULT_CHAT_ID');
+    if (chatSel) {
+      settings.FEISHU_DEFAULT_CHAT_ID = chatSel.value;
+      const chatLabel = chatSel.options[chatSel.selectedIndex] ? chatSel.options[chatSel.selectedIndex].textContent : '';
+      settings.FEISHU_DEFAULT_CHAT_NAME = (chatLabel || '').replace(/^#/, '').trim();
+    }
+    const adminSel = document.getElementById('set-FEISHU_ADMIN_OPEN_ID');
+    if (adminSel) settings.FEISHU_ADMIN_OPEN_ID = adminSel.value;
+    if (state.channels && state.channels.length) {
+      settings.FEISHU_CHANNELS = state.channels.map(c => c.id + '|' + (c.name || c.id)).join(',');
+    }
+    if (state.members && state.members.length) {
+      settings.FEISHU_STANDUP_MEMBERS = state.members.map(m => {
+        const parts = [m.id || '', m.name || m.display_name || ''];
+        if (m.email) parts.push(m.email);
+        return parts.filter((part, idx) => idx === 0 || part).join('|');
+      }).join(',');
+    }
+    return settings;
+  }
+
+  async function saveAppSettings() {
+    const settings = collectAppSettings();
+    try {
+      await api('PUT', '/settings', { settings });
+      toast('设置已保存');
+      await loadSettings();
+    } catch (e) {
+      toast(e.message || '保存失败', 'error');
+    }
+  }
+
+  async function connectFeishuSettings() {
+    try {
+      await api('PUT', '/settings', { settings: collectAppSettings() });
+      await loadSettings();
+      toast(state.channels.length ? '飞书连接成功' : '凭证已保存，请先把机器人拉进群后再重新拉取');
+    } catch (e) {
+      toast(e.message || '飞书连接失败', 'error');
+    }
+  }
+
+  async function refreshFeishuDiscovery() {
+    try {
+      await api('PUT', '/settings', { settings: collectAppSettings() });
+      await loadSettings();
+      toast(state.channels.length ? '群聊已刷新' : '当前没有可见群聊');
+    } catch (e) {
+      toast(e.message || '群聊刷新失败', 'error');
+    }
+  }
+
+  async function refreshFeishuMembers(chatId) {
+    const selectedChatId = chatId || (document.getElementById('set-FEISHU_DEFAULT_CHAT_ID') || {}).value || '';
+    if (!selectedChatId) {
+      toast('请先选择群聊', 'error');
+      return;
+    }
+    try {
+      state.members = await api('GET', '/members?channel_id=' + encodeURIComponent(selectedChatId));
+      state.feishuDiscoveryError = '';
+      await loadSettings();
+      toast(state.members.length ? '成员已同步' : '这个群里还没有可同步成员');
+    } catch (e) {
+      state.feishuDiscoveryError = e.message || '成员同步失败';
+      toast(state.feishuDiscoveryError, 'error');
     }
   }
 
@@ -1619,20 +1876,20 @@
     el.innerHTML =
       '<div class="stat-card" style="margin-bottom:16px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
-          '<div style="font-weight:600;font-size:14px">🔗 Public Standup Feed</div>' +
+          '<div style="font-weight:600;font-size:14px">公开只读页面</div>' +
           '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">' +
             '<input type="checkbox" id="feed-toggle" onchange="toggleFeed(this.checked)" ' + (feedEnabled ? 'checked' : '') + ' style="width:16px;height:16px">' +
-            'Enable public feed' +
+            '启用公开页面' +
           '</label>' +
         '</div>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Share a read-only URL showing today\'s standups — no login required.</p>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">生成一个无需登录的只读链接，用于查看当天站会。</p>' +
         (feedEnabled && feedUrl
           ? '<div style="display:flex;gap:8px;align-items:center">' +
               '<input id="feed-url-display" class="input" style="flex:1;font-size:12px;background:var(--surface2);color:var(--text-muted)" readonly value="' + esc(feedUrl) + '">' +
-              '<button class="btn btn-secondary btn-sm" onclick="copyFeedUrl()">Copy</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="copyFeedUrl()">复制</button>' +
             '</div>'
           : (feedEnabled
-              ? '<button class="btn btn-primary btn-sm" onclick="generateFeedToken()">Generate Feed URL</button>'
+              ? '<button class="btn btn-primary btn-sm" onclick="generateFeedToken()">生成链接</button>'
               : '')) +
       '</div>';
   }
@@ -1648,24 +1905,24 @@
   async function generateFeedToken() {
     try {
       const res = await api('POST', '/feed-token');
-      toast('Feed URL generated');
+      toast('公开链接已生成');
       await loadSettings();
-    } catch (e) { toast('Failed to generate feed URL', 'error'); }
+    } catch (e) { toast('公开链接生成失败', 'error'); }
   }
 
   async function disableFeed() {
     try {
       await api('DELETE', '/feed-token');
-      toast('Public feed disabled');
+      toast('公开页面已关闭');
       await loadSettings();
-    } catch (e) { toast('Failed to disable feed', 'error'); }
+    } catch (e) { toast('关闭失败', 'error'); }
   }
 
   function copyFeedUrl() {
     const el = document.getElementById('feed-url-display');
     if (el) {
-      navigator.clipboard.writeText(el.value).then(() => toast('URL copied!')).catch(() => {
-        el.select(); document.execCommand('copy'); toast('URL copied!');
+      navigator.clipboard.writeText(el.value).then(() => toast('链接已复制')).catch(() => {
+        el.select(); document.execCommand('copy'); toast('链接已复制');
       });
     }
   }
@@ -1678,18 +1935,18 @@
     const managerEmail = standup.manager_email || '';
     el.innerHTML =
       '<div class="stat-card" style="margin-bottom:16px">' +
-        '<div style="font-weight:600;font-size:14px;margin-bottom:8px">📧 Manager Digest Email</div>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Send a daily HTML email with today\'s standup responses to a manager after the standup window.</p>' +
+        '<div style="font-weight:600;font-size:14px;margin-bottom:8px">管理者邮件摘要</div>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">站会结束后把当天回复发到指定邮箱。</p>' +
         '<div style="display:grid;gap:10px">' +
           '<div>' +
-            '<label style="font-size:12px;color:var(--text-muted)">Manager email</label>' +
+            '<label style="font-size:12px;color:var(--text-muted)">邮箱</label>' +
             '<input id="digest-email" class="input" type="email" placeholder="manager@company.com" value="' + esc(managerEmail) + '" style="margin-top:4px;width:100%">' +
           '</div>' +
           '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">' +
             '<input type="checkbox" id="digest-toggle" ' + (digestEnabled ? 'checked' : '') + ' style="width:16px;height:16px">' +
-            'Send daily digest to manager' +
+            '发送每日邮件摘要' +
           '</label>' +
-          '<div><button class="btn btn-primary btn-sm" onclick="saveDigestSettings()">Save</button></div>' +
+          '<div><button class="btn btn-primary btn-sm" onclick="saveDigestSettings()">保存</button></div>' +
         '</div>' +
       '</div>';
   }
@@ -1699,10 +1956,10 @@
     const enabled = !!(document.getElementById('digest-toggle') || {}).checked;
     try {
       const standups = await api('GET', '/standups');
-      if (!standups.length) { toast('No standup configured', 'error'); return; }
+      if (!standups.length) { toast('还没有站会配置', 'error'); return; }
       await api('PUT', '/standups/' + standups[0].id, { manager_email: email, manager_digest_enabled: enabled });
-      toast('Digest settings saved');
-    } catch (e) { toast('Failed to save digest settings', 'error'); }
+      toast('邮件摘要已保存');
+    } catch (e) { toast('邮件摘要保存失败', 'error'); }
   }
 
   // ── Webhooks ──
@@ -1713,7 +1970,7 @@
       state.webhooks = await api('GET', '/webhooks');
       renderWebhooks();
     } catch (e) {
-      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">Failed to load webhooks.</p>';
+      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">Webhook 加载失败。</p>';
     }
   }
 
@@ -1722,48 +1979,48 @@
     const rows = state.webhooks.map(h =>
       '<tr><td class="webhook-url">' + esc(h.url) + '</td>' +
       '<td style="color:var(--text-dim);font-size:12px">' + (h.created_at ? new Date(h.created_at).toLocaleDateString() : '') + '</td>' +
-      '<td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="deleteWebhook(' + h.id + ')">Delete</button></td></tr>'
+      '<td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="deleteWebhook(' + h.id + ')">删除</button></td></tr>'
     ).join('');
 
     el.innerHTML =
       '<div class="webhooks-table-wrap">' +
-      '<table class="webhooks-table"><thead><tr><th>URL</th><th>Added</th><th></th></tr></thead>' +
-      '<tbody>' + (rows || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:24px">No webhooks yet</td></tr>') + '</tbody>' +
+      '<table class="webhooks-table"><thead><tr><th>URL</th><th>添加时间</th><th></th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:24px">还没有 Webhook</td></tr>') + '</tbody>' +
       '</table></div>' +
       '<div class="add-webhook-row">' +
       '<input type="url" id="new-webhook-url" placeholder="https://example.com/webhook"/>' +
-      '<button class="btn btn-primary" onclick="addWebhook()">&#43; Add Webhook</button>' +
+      '<button class="btn btn-primary" onclick="addWebhook()">&#43; 添加 Webhook</button>' +
       '</div>';
   }
 
   async function addWebhook() {
     const urlEl = document.getElementById('new-webhook-url');
     const url = urlEl.value.trim();
-    if (!url) { toast('Please enter a URL', 'error'); return; }
+    if (!url) { toast('请输入 URL', 'error'); return; }
     try {
       const hook = await api('POST', '/webhooks', { url });
       state.webhooks.push(hook);
       renderWebhooks();
-      toast('Webhook added');
+      toast('Webhook 已添加');
     } catch (e) { toast(e.message, 'error'); }
   }
 
   async function deleteWebhook(id) {
-    if (!confirm('Remove this webhook?')) return;
+    if (!confirm('确定删除这个 Webhook 吗？')) return;
     try {
       await api('DELETE', '/webhooks/' + id);
       state.webhooks = state.webhooks.filter(h => h.id !== id);
       renderWebhooks();
-      toast('Webhook removed');
+      toast('Webhook 已删除');
     } catch (e) { toast(e.message, 'error'); }
   }
 
   // ── Modal ──
   async function openCreateModal() {
     await loadMembers();
-    document.getElementById('modal-title').textContent = 'New Standup';
+    document.getElementById('modal-title').textContent = '新建站会';
     document.getElementById('modal-standup-id').value = '';
-    document.getElementById('f-name').value = 'Morning Standup';
+    document.getElementById('f-name').value = '每日站会';
     document.getElementById('f-channel').value = '';
     document.getElementById('f-time').value = '09:00';
     selectTz('UTC');
@@ -1784,7 +2041,7 @@
     document.getElementById('f-ai-summary-toggle').classList.remove('on');
     document.getElementById('f-ai-provider').value = 'openai';
     selectDays(['mon','tue','wed','thu','fri']);
-    setQuestions(['What did you complete yesterday?','What are you working on today?','Any blockers?']);
+    setQuestions(['昨天完成了什么？','今天计划做什么？','有什么阻塞？']);
     clearParticipants();
     document.getElementById('standup-modal').classList.add('open');
   }
@@ -1794,7 +2051,7 @@
     if (!s) return;
     if (s.channel_id) await loadChannelMembers(s.channel_id);
     else await loadMembers();
-    document.getElementById('modal-title').textContent = 'Edit Standup';
+    document.getElementById('modal-title').textContent = '编辑站会';
     document.getElementById('modal-standup-id').value = id;
     document.getElementById('f-name').value = s.name || '';
     document.getElementById('f-channel').value = s.channel_id || '';
@@ -1836,21 +2093,21 @@
     const days = Array.from(document.querySelectorAll('.day-chip.selected')).map(d => d.dataset.day);
     const questions = Array.from(document.querySelectorAll('.question-input')).map(i => i.value.trim()).filter(Boolean);
     if (!document.getElementById('f-channel').value) {
-      toast('Please select a channel', 'error'); return;
+      toast('请选择群聊', 'error'); return;
     }
     if (!days.length) {
-      toast('Please select at least one day', 'error'); return;
+      toast('请至少选择一天', 'error'); return;
     }
     if (!document.getElementById('f-time').value) {
-      toast('Please set a standup time', 'error'); return;
+      toast('请设置站会时间', 'error'); return;
     }
     const body = {
-      name: document.getElementById('f-name').value.trim() || 'Morning Standup',
+      name: document.getElementById('f-name').value.trim() || '每日站会',
       channel_id: document.getElementById('f-channel').value,
       schedule_time: document.getElementById('f-time').value,
       schedule_tz: getTzValue(),
       schedule_days: days,
-      questions: questions.length ? questions : ['What did you complete yesterday?','What are you working on today?','Any blockers?'],
+      questions: questions.length ? questions : ['昨天完成了什么？','今天计划做什么？','有什么阻塞？'],
       participants: state.participants,
       report_channel: document.getElementById('f-report-channel').value,
       report_time: document.getElementById('f-report-time').value,
@@ -1881,7 +2138,7 @@
       }
       renderStandups();
       closeModal();
-      toast(id ? 'Standup updated' : 'Standup created');
+      toast(id ? '站会已更新' : '站会已创建');
       // Auto-refresh related data
       loadStats().catch(() => {});
       loadMembers().catch(() => {});
@@ -1900,14 +2157,14 @@
       const data = await fetch('/dashboard/api/analytics?days=' + days).then(checkAuth).then(r => r.json());
       renderAnalytics(data, days);
     } catch (e) {
-      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">Failed to load analytics.</p>';
+      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">分析数据加载失败。</p>';
     }
   }
 
   function renderAnalytics(rows, days) {
     const el = document.getElementById('analytics-content');
     if (!rows.length) {
-      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">No data yet. Run some standups first!</p>';
+      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">还没有数据。</p>';
       return;
     }
     const tableRows = rows.map(r => {
@@ -1925,7 +2182,7 @@
       '<div class="webhooks-table-wrap">' +
       '<table class="webhooks-table">' +
       '<thead><tr>' +
-      '<th>Member</th><th>Responses (' + days + 'd)</th><th>Blockers</th><th>Last Standup</th>' +
+      '<th>成员</th><th>提交（' + days + ' 天）</th><th>阻塞</th><th>最近提交</th>' +
       '</tr></thead><tbody>' + tableRows + '</tbody></table></div>';
   }
 
@@ -1956,7 +2213,7 @@
     row.className = 'question-row';
     row.innerHTML =
       '<span class="q-drag">&#8597;</span>' +
-      '<input type="text" class="question-input" value="' + esc(val) + '" placeholder="Enter question..."/>' +
+      '<input type="text" class="question-input" value="' + esc(val) + '" placeholder="输入问题..."/>' +
       '<button class="q-del" type="button" onclick="this.parentElement.remove()">&times;</button>';
     document.getElementById('questions-list').appendChild(row);
   }
@@ -1978,7 +2235,7 @@
   function populateParticipantsDropdown() {
     const dd = document.getElementById('participants-dropdown');
     dd.innerHTML =
-      '<div class="participant-search"><input type="text" placeholder="Search members..." oninput="filterParticipants(this.value)" onclick="event.stopPropagation()"></div>' +
+      '<div class="participant-search"><input type="text" placeholder="搜索成员..." oninput="filterParticipants(this.value)" onclick="event.stopPropagation()"></div>' +
       '<div class="participant-list">' +
       state.members.map(m =>
         '<div class="multi-opt" data-id="' + esc(m.id) + '" data-name="' + esc((m.name || '') + ' ' + (m.display_name || '')).toLowerCase() + '" onclick="toggleParticipant(&quot;' + esc(m.id) + '&quot;, &quot;' + esc(m.name || m.display_name || m.id) + '&quot;)">' +
@@ -2002,7 +2259,7 @@
     let noRes = dd.querySelector('.no-results');
     if (!visible && q) {
       if (!noRes) { noRes = document.createElement('div'); noRes.className = 'no-results'; dd.querySelector('.participant-list').appendChild(noRes); }
-      noRes.textContent = 'No members found';
+      noRes.textContent = '没有找到成员';
       noRes.style.display = '';
     } else if (noRes) { noRes.style.display = 'none'; }
   }
@@ -2026,7 +2283,7 @@
       opt.classList.toggle('selected', sel);
     });
     if (!state.participants.length) {
-      disp.innerHTML = '<span class="placeholder-text">Select participants...</span>';
+      disp.innerHTML = '<span class="placeholder-text">选择成员...</span>';
       return;
     }
     disp.innerHTML = state.participants.map(id => {
@@ -2056,7 +2313,7 @@
       state.members = await api('GET', '/members?channel_id=' + encodeURIComponent(channelId));
       populateParticipantsDropdown();
     } catch (e) {
-      console.error('Failed to load channel members:', e);
+      console.error('成员加载失败:', e);
     }
   }
 
@@ -2187,7 +2444,7 @@
     }
     tzHighlightIdx = -1;
     if (!matches.length) {
-      tzDropdown.innerHTML = '<div class="tz-option" style="color:var(--text-dim)">No match</div>';
+      tzDropdown.innerHTML = '<div class="tz-option" style="color:var(--text-dim)">没有匹配结果</div>';
     } else {
       tzDropdown.innerHTML = matches.slice(0, 50).map((tz, i) =>
         '<div class="tz-option" data-tz="' + esc(tz.value) + '" onmousedown="selectTz(\'' + esc(tz.value) + '\')">' + esc(tz.label) + '</div>'
@@ -2244,13 +2501,13 @@
   function renderKudosBoard(board) {
     const el = document.getElementById('kudos-board');
     if (!el) return;
-    if (!board.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">No kudos given yet. Be the first! 🏆</p>'; return; }
+    if (!board.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">还没有表扬记录。</p>'; return; }
     const medals = ['🥇','🥈','🥉'];
     el.innerHTML = board.slice(0,10).map((r,i) =>
       '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">' +
       '<span style="font-size:1.2rem;">' + (medals[i] || '🏅') + '</span>' +
       '<span style="flex:1;font-weight:600;">@' + esc(r.to_user) + '</span>' +
-      '<span style="background:rgba(245,158,11,0.15);color:#d97706;padding:2px 10px;border-radius:99px;font-size:0.82rem;font-weight:700;">' + r.received + ' kudos</span>' +
+      '<span style="background:rgba(245,158,11,0.15);color:#d97706;padding:2px 10px;border-radius:99px;font-size:0.82rem;font-weight:700;">' + r.received + ' 次</span>' +
       '</div>'
     ).join('');
   }
@@ -2258,7 +2515,7 @@
   function renderKudosFeed(kudos) {
     const el = document.getElementById('kudos-feed');
     if (!el) return;
-    if (!kudos.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">No kudos yet — give some! DM the bot: <code style="background:var(--surface2);padding:2px 6px;border-radius:4px">kudos @teammate Great job!</code></p>'; return; }
+    if (!kudos.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;">还没有表扬。私聊机器人：<code style="background:var(--surface2);padding:2px 6px;border-radius:4px">kudos @同事 做得很好</code></p>'; return; }
     el.innerHTML = kudos.map(k => {
       const ago = timeAgo(k.created_at);
       return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;">' +
@@ -2271,10 +2528,10 @@
   function timeAgo(iso) {
     if (!iso) return '';
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return Math.floor(diff / 86400) + 'd ago';
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+    return Math.floor(diff / 86400) + ' 天前';
   }
 
   // ── Schedules ──
@@ -2287,7 +2544,7 @@
       state.schedules = await api('GET', '/schedules');
       renderSchedules();
     } catch (e) {
-      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">Failed to load schedules.</p>';
+      el.innerHTML = '<p style="color:var(--text-dim);padding:24px">调度加载失败。</p>';
     }
   }
 
@@ -2295,29 +2552,29 @@
     const el = document.getElementById('schedules-list');
     if (!el) return;
     if (!state.schedules || !state.schedules.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128197;</div><h3>No schedules yet</h3><p>Create named schedules with custom questions and participant lists.</p><button class="btn btn-primary" onclick="openCreateScheduleModal()">&#43; New Schedule</button></div>';
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128197;</div><h3>还没有调度</h3><p>为不同团队配置独立的收集时间和问题。</p><button class="btn btn-primary" onclick="openCreateScheduleModal()">&#43; 新建调度</button></div>';
       return;
     }
     el.innerHTML = state.schedules.map(s => {
       const chName = channelName(s.channel_id);
       const days = Array.isArray(s.schedule_days) ? s.schedule_days.join(', ') : (s.schedule_days || '').split(',').join(', ');
       const participants = (s.participants || []).length;
-      const badge = s.active ? '<span class="badge-active">Active</span>' : '<span class="badge-paused">Paused</span>';
+      const badge = s.active ? '<span class="badge-active">启用</span>' : '<span class="badge-paused">暂停</span>';
       return '<div class="standup-card" id="sched-' + s.id + '">' +
         '<div class="standup-icon">&#128197;</div>' +
         '<div class="standup-info">' +
-        '<div class="standup-name">' + esc(s.name || 'Daily Standup') + '</div>' +
+        '<div class="standup-name">' + esc(s.name || '每日站会') + '</div>' +
         '<div class="standup-meta">' +
         (s.channel_id ? '<span>#' + esc(chName) + '</span>' : '') +
         '<span>' + esc(s.schedule_time || '09:00') + ' ' + esc(s.schedule_tz || 'UTC') + '</span>' +
         '<span>' + esc(days) + '</span>' +
-        '<span>' + participants + ' participant' + (participants === 1 ? '' : 's') + '</span>' +
+        '<span>' + participants + ' 人</span>' +
         badge +
         '</div></div>' +
         '<div class="standup-actions">' +
-        '<button class="toggle ' + (s.active ? 'on' : '') + '" onclick="toggleSchedule(' + s.id + ', this)" title="Toggle active"></button>' +
-        '<button class="btn btn-secondary btn-sm" onclick="openEditScheduleModal(' + s.id + ')">Edit</button>' +
-        '<button class="btn btn-danger btn-sm" onclick="deleteSchedule(' + s.id + ')">Delete</button>' +
+        '<button class="toggle ' + (s.active ? 'on' : '') + '" onclick="toggleSchedule(' + s.id + ', this)" title="启用/暂停"></button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditScheduleModal(' + s.id + ')">编辑</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteSchedule(' + s.id + ')">删除</button>' +
         '</div></div>';
     }).join('');
   }
@@ -2331,26 +2588,26 @@
       sched.active = newActive;
       btn.classList.toggle('on', newActive);
       renderSchedules();
-      toast(newActive ? 'Schedule activated' : 'Schedule paused');
+      toast(newActive ? '调度已启用' : '调度已暂停');
     } catch (e) { toast(e.message, 'error'); }
   }
 
   async function deleteSchedule(id) {
-    if (!confirm('Delete this schedule?')) return;
+    if (!confirm('确定删除这个调度吗？')) return;
     try {
       await api('DELETE', '/schedules/' + id);
       state.schedules = (state.schedules || []).filter(s => s.id !== id);
       renderSchedules();
-      toast('Schedule deleted');
+      toast('调度已删除');
     } catch (e) { toast(e.message, 'error'); }
   }
 
   async function openCreateScheduleModal() {
     if (!state.members.length) await loadMembers();
-    document.getElementById('modal-title').textContent = 'New Schedule';
+    document.getElementById('modal-title').textContent = '新建调度';
     document.getElementById('modal-standup-id').value = '';
     document.getElementById('modal-standup-id').dataset.mode = 'schedule';
-    document.getElementById('f-name').value = 'Daily Standup';
+    document.getElementById('f-name').value = '每日站会';
     document.getElementById('f-channel').value = '';
     document.getElementById('f-time').value = '09:00';
     selectTz('UTC');
@@ -2371,7 +2628,7 @@
     document.getElementById('f-ai-summary-toggle').classList.remove('on');
     document.getElementById('f-ai-provider').value = 'openai';
     selectDays(['mon','tue','wed','thu','fri']);
-    setQuestions(['What did you complete yesterday?','What are you working on today?','Any blockers?']);
+    setQuestions(['昨天完成了什么？','今天计划做什么？','有什么阻塞？']);
     clearParticipants();
     document.getElementById('standup-modal').classList.add('open');
   }
@@ -2380,7 +2637,7 @@
     const s = (state.schedules || []).find(x => x.id === id);
     if (!s) return;
     if (!state.members.length) await loadMembers();
-    document.getElementById('modal-title').textContent = 'Edit Schedule';
+    document.getElementById('modal-title').textContent = '编辑调度';
     document.getElementById('modal-standup-id').value = id;
     document.getElementById('modal-standup-id').dataset.mode = 'schedule';
     document.getElementById('f-name').value = s.name || '';
@@ -2408,7 +2665,7 @@
     document.getElementById('f-ai-provider').value = s.ai_provider || 'openai';
     selectDays((s.schedule_days || 'mon,tue,wed,thu,fri').split(','));
     const qs = Array.isArray(s.questions) ? s.questions : [];
-    setQuestions(qs.length ? qs : ['What did you complete yesterday?','What are you working on today?','Any blockers?']);
+    setQuestions(qs.length ? qs : ['昨天完成了什么？','今天计划做什么？','有什么阻塞？']);
     setParticipants(s.participants || []);
     document.getElementById('standup-modal').classList.add('open');
   }
@@ -2436,7 +2693,7 @@
   function renderTemplateGrid(templates) {
     const grid = document.getElementById('template-grid');
     if (!templates || !templates.length) {
-      grid.innerHTML = '<p style="color:var(--text-dim);font-size:13px">No templates available.</p>';
+      grid.innerHTML = '<p style="color:var(--text-dim);font-size:13px">没有可用模板。</p>';
       return;
     }
     grid.innerHTML = templates.map(t => {
@@ -2459,7 +2716,7 @@
       document.getElementById('f-name').value = t.name;
     }
     document.getElementById('template-gallery').style.display = 'none';
-    toast('Template applied: ' + t.name);
+    toast('已应用模板：' + t.name);
   }
 
   // ── Save standup / schedule (mode-aware) ──
@@ -2478,17 +2735,22 @@
     const days = Array.from(document.querySelectorAll('.day-chip.selected')).map(d => d.dataset.day);
     const questions = Array.from(document.querySelectorAll('.question-input')).map(i => i.value.trim()).filter(Boolean);
     const body = {
-      name: document.getElementById('f-name').value.trim() || 'Daily Standup',
+      name: document.getElementById('f-name').value.trim() || '每日站会',
       channel_id: document.getElementById('f-channel').value,
       schedule_time: document.getElementById('f-time').value,
       schedule_tz: getTzValue(),
       schedule_days: days,
-      questions: questions.length ? questions : ['What did you complete yesterday?','What are you working on today?','Any blockers?'],
+      questions: questions.length ? questions : ['昨天完成了什么？','今天计划做什么？','有什么阻塞？'],
       participants: state.participants,
       reminder_minutes: parseInt(document.getElementById('f-reminder').value) || 0,
       post_to_thread: document.getElementById('f-post-thread').checked,
       notify_on_report: document.getElementById('f-notify-toggle').classList.contains('on'),
       weekend_reminder: parseInt(document.getElementById('f-reminder').value) === -1,
+      report_channel: document.getElementById('f-report-channel').value,
+      report_time: document.getElementById('f-report-time').value,
+      group_by: document.getElementById('f-group-by').value,
+      ai_summary_enabled: document.getElementById('f-ai-summary-toggle').classList.contains('on'),
+      ai_provider: document.getElementById('f-ai-provider').value,
     };
     try {
       let updated;
@@ -2504,7 +2766,7 @@
       renderSchedules();
       closeModal();
       document.getElementById('modal-standup-id').dataset.mode = '';
-      toast(id ? 'Schedule updated' : 'Schedule created');
+      toast(id ? '调度已更新' : '调度已创建');
       loadStats().catch(() => {});
     } catch (e) { toast(e.message, 'error'); }
   }
@@ -2517,7 +2779,7 @@
       const rules = await fetch('/dashboard/api/rules').then(checkAuth).then(r => r.json()).catch(() => []);
       renderRules(rules);
     } catch(e) {
-      el.innerHTML = '<p style="color:var(--text-muted)">Failed to load rules.</p>';
+      el.innerHTML = '<p style="color:var(--text-muted)">自动化规则加载失败。</p>';
     }
   }
 
@@ -2525,11 +2787,11 @@
     const el = document.getElementById('rules-list');
     if (!el) return;
     if (!rules.length) {
-      el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚡</div><h3>No automation rules</h3><p>Add a rule to automate actions when standups trigger events.</p></div>';
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚡</div><h3>还没有自动化规则</h3><p>添加规则后，可在站会事件触发时自动执行动作。</p></div>';
       return;
     }
-    const triggerLabels = { blocker_detected: '🚧 Blockers Detected', low_participation: '📉 Low Participation', standup_complete: '✅ Standup Complete' };
-    const actionLabels = { post_to_channel: '📣 Post to Channel', send_dm: '💬 Send DM', fire_webhook: '🔗 Webhook' };
+    const triggerLabels = { blocker_detected: '发现阻塞', low_participation: '参与率过低', standup_complete: '站会完成' };
+    const actionLabels = { post_to_channel: '发送到群聊', send_dm: '发送私聊', fire_webhook: '调用 Webhook' };
     el.innerHTML = '<div class="standups-grid">' + rules.map(r =>
       '<div class="stat-card" style="display:flex;align-items:center;gap:14px;padding:14px 18px;">' +
       '<div style="flex:1;min-width:0;">' +
@@ -2540,18 +2802,18 @@
       '<span style="font-size:0.8rem;color:var(--text-muted);align-self:center;">' + esc(r.action_target) + '</span>' +
       '</div>' +
       '</div>' +
-      '<button class="btn btn-secondary btn-sm" onclick="deleteRule(' + r.id + ')" style="flex-shrink:0;">Delete</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="deleteRule(' + r.id + ')" style="flex-shrink:0;">删除</button>' +
       '</div>'
     ).join('') + '</div>';
   }
 
   async function deleteRule(id) {
-    if (!confirm('Delete this automation rule?')) return;
+    if (!confirm('确定删除这个自动化规则吗？')) return;
     try {
       await api('DELETE', '/rules/' + id);
       state.loaded['automation'] = false;
       loadRules();
-      toast('Rule deleted');
+      toast('规则已删除');
     } catch(e) { toast(e.message, 'error'); }
   }
 
@@ -2588,7 +2850,7 @@
       event.target.reset();
       state.loaded['automation'] = false;
       loadRules();
-      toast('Rule created');
+      toast('规则已创建');
     } catch(e) { toast(e.message, 'error'); }
   }
 
@@ -2600,11 +2862,11 @@
       const me = await api('GET', '/me');
       _mcpTeamId = me.team_id || '';
       const el = document.getElementById('mcp-team-id');
-      if (el) el.textContent = _mcpTeamId || 'Not available';
+      if (el) el.textContent = _mcpTeamId || '不可用';
       renderMCPConfig();
     } catch(e) {
       const el = document.getElementById('mcp-team-id');
-      if (el) el.textContent = 'Error loading';
+      if (el) el.textContent = '加载失败';
     }
   }
 
@@ -2662,13 +2924,13 @@
   function copyMCPConfig() {
     const out = document.getElementById('mcp-config-output');
     if (!out) return;
-    navigator.clipboard.writeText(out.textContent).then(() => toast('Config copied!'));
+    navigator.clipboard.writeText(out.textContent).then(() => toast('配置已复制'));
   }
 
   function copyToClipboard(id) {
     const el = document.getElementById(id);
     if (!el) return;
-    navigator.clipboard.writeText(el.textContent.trim()).then(() => toast('Copied!'));
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => toast('已复制'));
   }
 
   // ── MCP ──
@@ -2680,13 +2942,13 @@
     fetch('/dashboard/api/mcp/keys')
       .then(checkAuth).then(r => r.json())
       .then(data => renderMCPKeys(data.keys || []))
-      .catch(() => { document.getElementById('mcp-keys-list').innerHTML = '<p style="color:var(--text-muted)">Could not load keys.</p>'; });
+      .catch(() => { document.getElementById('mcp-keys-list').innerHTML = '<p style="color:var(--text-muted)">密钥加载失败。</p>'; });
   }
 
   function renderMCPKeys(keys) {
     const el = document.getElementById('mcp-keys-list');
     if (!keys.length) {
-      el.innerHTML = '<p style="font-size:0.88rem;color:var(--text-muted)">No API keys yet. Generate one to connect an AI assistant.</p>';
+      el.innerHTML = '<p style="font-size:0.88rem;color:var(--text-muted)">还没有 API 密钥。</p>';
       return;
     }
     const rows = keys.map(k => `
@@ -2694,13 +2956,13 @@
         <td><code style="font-size:0.82rem">${k.key_prefix}...</code></td>
         <td>${k.name || '—'}</td>
         <td style="font-size:0.8rem;color:var(--text-muted)">${k.created_at ? new Date(k.created_at).toLocaleDateString() : '—'}</td>
-        <td style="font-size:0.8rem;color:var(--text-muted)">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</td>
-        <td><button class="btn btn-secondary" style="font-size:0.78rem;padding:4px 10px;color:#dc2626" onclick="revokeMCPKey(${k.id})">Revoke</button></td>
+        <td style="font-size:0.8rem;color:var(--text-muted)">${k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : '从未使用'}</td>
+        <td><button class="btn btn-secondary" style="font-size:0.78rem;padding:4px 10px;color:#dc2626" onclick="revokeMCPKey(${k.id})">撤销</button></td>
       </tr>`).join('');
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.88rem">
       <thead><tr style="text-align:left;color:var(--text-muted);font-size:0.78rem">
-        <th style="padding:6px 8px">Prefix</th><th style="padding:6px 8px">Name</th>
-        <th style="padding:6px 8px">Created</th><th style="padding:6px 8px">Last Used</th><th></th>
+        <th style="padding:6px 8px">前缀</th><th style="padding:6px 8px">名称</th>
+        <th style="padding:6px 8px">创建时间</th><th style="padding:6px 8px">最近使用</th><th></th>
       </tr></thead><tbody>${rows}</tbody></table>`;
   }
 
@@ -2718,7 +2980,7 @@
   }
 
   async function createMCPKey() {
-    const name = document.getElementById('mcp-key-name').value.trim() || 'Default';
+    const name = document.getElementById('mcp-key-name').value.trim() || '默认';
     try {
       const res = await fetch('/dashboard/api/mcp/keys', {
         method: 'POST',
@@ -2726,28 +2988,28 @@
         body: JSON.stringify({name}),
       });
       checkAuth(res);
-      if (!res.ok) throw new Error('Failed to create key');
+      if (!res.ok) throw new Error('密钥创建失败');
       const data = await res.json();
-      if (!data.key) throw new Error('No key returned');
+      if (!data.key) throw new Error('没有返回密钥');
       document.getElementById('mcp-new-key').textContent = data.key;
       document.getElementById('mcp-key-form-wrap').style.display = 'none';
       document.getElementById('mcp-key-result-wrap').style.display = '';
-    } catch(e) { toast(e.message || 'Failed to generate key', 'error'); }
+    } catch(e) { toast(e.message || '密钥生成失败', 'error'); }
   }
 
   async function revokeMCPKey(id) {
-    if (!confirm('Revoke this key? Connections using it will stop working.')) return;
+    if (!confirm('确定撤销这个密钥吗？使用它的连接会停止工作。')) return;
     const res = await fetch(`/dashboard/api/mcp/keys/${id}`, {method: 'DELETE'});
     checkAuth(res);
-    if (!res.ok) { toast('Failed to revoke key', 'error'); return; }
+    if (!res.ok) { toast('撤销失败', 'error'); return; }
     _mcpLoaded = false;
     loadMCPKeys();
-    toast('Key revoked');
+    toast('密钥已撤销');
   }
 
   function copyNewKey() {
     navigator.clipboard.writeText(document.getElementById('mcp-new-key').textContent);
-    toast('Key copied!');
+    toast('密钥已复制');
   }
 
   function showMCPTab(tab) {
@@ -2759,7 +3021,7 @@
   function copyConfig(tab) {
     const text = document.getElementById(`snippet-${tab}`).textContent;
     navigator.clipboard.writeText(text);
-    toast('Copied!');
+    toast('已复制');
   }
 
   // ── Boot ──

@@ -127,7 +127,7 @@ def _fire_rule(rule: dict, trigger: str, context: dict, client) -> None:
 
     action = rule["action"]
     target = rule["action_target"]
-    default_msg = f"[Morgenruf] Trigger: {trigger} | Team: {context.get('team', '')}"
+    default_msg = f"[晨序] Trigger: {trigger} | Team: {context.get('team', '')}"
     msg = _render_message(rule.get("action_message"), default_msg, {**context, "trigger": trigger})
 
     if action in ("post_to_channel", "send_dm"):

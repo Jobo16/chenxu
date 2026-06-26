@@ -1,14 +1,14 @@
 display_information:
-  name: Morgenruf
+  name: 晨序
   description: "🌅 Self-hosted daily standup bot — structured updates, per-project tracking, blocker detection."
   background_color: "#0d1117"
   long_description: |
-    Morgenruf (German: "morning call") is an open-source Slack standup bot that replaces 
+    晨序 is an open-source Slack standup bot that replaces 
     expensive SaaS tools like Geekbot or Standup & Prosper — for free.
 
-    Every day at your configured time, Morgenruf DMs each team member with 3 questions:
+    Every day at your configured time, 晨序 DMs each team member with 3 questions:
     ✅ What did you complete yesterday?
-    �� What are you working on today?
+    🎯 What are you working on today?
     🚧 Any blockers?
 
     Answers are collected privately via DM and posted as a clean, structured summary 
@@ -30,7 +30,7 @@ features:
     messages_tab_enabled: true
     messages_tab_read_only_enabled: false
   bot_user:
-    display_name: Morgenruf
+    display_name: 晨序
     always_online: true
   shortcuts:
     - name: Submit standup

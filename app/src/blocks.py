@@ -1,4 +1,4 @@
-"""Slack Block Kit JSON builders for Morgenruf."""
+"""Slack Block Kit JSON builders for 晨序."""
 
 from __future__ import annotations
 
@@ -816,7 +816,7 @@ def app_home_view(
             "text": {
                 "type": "mrkdwn",
                 "text": (
-                    "Hello there, I'm *Morgenruf*, and this is my home.\n"
+                    "Hello there, I'm *晨序*, and this is my home.\n"
                     "If you want to message me, click the *Messages* tab 👆"
                 ),
             },
@@ -1263,7 +1263,7 @@ def help_modal() -> dict:
     """Help modal shown from App Home."""
     return {
         "type": "modal",
-        "title": {"type": "plain_text", "text": "Morgenruf Help"},
+        "title": {"type": "plain_text", "text": "晨序 Help"},
         "close": {"type": "plain_text", "text": "Close"},
         "blocks": [
             {
@@ -1275,7 +1275,7 @@ def help_modal() -> dict:
                 "text": {
                     "type": "mrkdwn",
                     "text": (
-                        "*Morgenruf* runs async standups in Slack. "
+                        "*晨序* runs async standups in Slack. "
                         "At your scheduled time, each member gets a DM with your standup questions. "
                         "Answers are collected and posted as a threaded summary in your standup channel."
                     ),

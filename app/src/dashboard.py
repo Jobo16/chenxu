@@ -13,6 +13,7 @@ from functools import wraps
 from urllib.parse import urlparse
 
 import db
+from app_settings import get_setting
 from flask import (
     Blueprint,
     Response,
@@ -29,9 +30,90 @@ logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint("dashboard", __name__, template_folder="templates")
 
-_APP_URL = os.environ.get("APP_URL", "http://localhost:3000")
 _CLIENT_ID = os.environ.get("SLACK_CLIENT_ID", "")
 _SCOPES = "channels:read,commands,groups:read,chat:write,im:history,im:read,im:write,users:read,users:read.email"
+
+_SETTING_KEYS = {
+    "APP_URL",
+    "DASHBOARD_AUTH",
+    "DASHBOARD_ADMIN_KEY",
+    "FEISHU_EVENT_MODE",
+    "FEISHU_APP_ID",
+    "FEISHU_APP_SECRET",
+    "FEISHU_VERIFICATION_TOKEN",
+    "FEISHU_TEAM_ID",
+    "FEISHU_TEAM_NAME",
+    "FEISHU_DEFAULT_CHAT_ID",
+    "FEISHU_DEFAULT_CHAT_NAME",
+    "FEISHU_CHANNELS",
+    "FEISHU_ADMIN_OPEN_ID",
+    "FEISHU_STANDUP_MEMBERS",
+    "FEISHU_SCHEDULE_TIME",
+    "FEISHU_SCHEDULE_TZ",
+    "FEISHU_SCHEDULE_DAYS",
+    "FEISHU_QUESTIONS_JSON",
+    "FEISHU_AI_SUMMARY_ENABLED",
+    "FEISHU_AI_PROVIDER",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "DEEPSEEK_BASE_URL",
+    "DEEPSEEK_MODEL",
+}
+_SECRET_SETTING_KEYS = {
+    "DASHBOARD_ADMIN_KEY",
+    "FEISHU_APP_SECRET",
+    "FEISHU_VERIFICATION_TOKEN",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "DEEPSEEK_API_KEY",
+}
+_SETTING_DEFAULTS = {
+    "APP_URL": "http://localhost:3000",
+    "DASHBOARD_AUTH": "none",
+    "FEISHU_EVENT_MODE": "ws",
+    "FEISHU_TEAM_ID": "feishu",
+    "FEISHU_TEAM_NAME": "飞书工作区",
+    "FEISHU_DEFAULT_CHAT_NAME": "站会",
+    "FEISHU_SCHEDULE_TIME": "09:30",
+    "FEISHU_SCHEDULE_TZ": "Asia/Shanghai",
+    "FEISHU_SCHEDULE_DAYS": "mon,tue,wed,thu,fri",
+    "FEISHU_AI_SUMMARY_ENABLED": "false",
+    "FEISHU_AI_PROVIDER": "openai",
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+    "DEEPSEEK_MODEL": "deepseek-chat",
+}
+
+_FEISHU_TRANSPORT_KEYS = {
+    "FEISHU_EVENT_MODE",
+    "FEISHU_APP_ID",
+    "FEISHU_APP_SECRET",
+    "FEISHU_VERIFICATION_TOKEN",
+}
+
+
+def _is_placeholder_feishu_chat_id(chat_id: str | None) -> bool:
+    value = (chat_id or "").strip().lower()
+    return not value or value == "oc_demo"
+
+
+def _is_placeholder_feishu_member_id(user_id: str | None) -> bool:
+    return (user_id or "").strip().lower() == "admin"
+
+
+def _add_feishu_channel(channels: dict[str, dict], chat_id: str | None, name: str | None = None) -> None:
+    if _is_placeholder_feishu_chat_id(chat_id):
+        return
+    normalized_id = chat_id.strip()
+    candidate_name = (name or normalized_id).strip() or normalized_id
+    existing = channels.get(normalized_id)
+    if existing:
+        existing_name = (existing.get("name") or normalized_id).strip() or normalized_id
+        if existing_name != normalized_id and candidate_name == normalized_id:
+            return
+        if existing_name != normalized_id and candidate_name != normalized_id:
+            return
+    channels[normalized_id] = {"id": normalized_id, "name": candidate_name}
 
 
 def _is_safe_webhook_url(url: str) -> bool:
@@ -53,6 +135,59 @@ def _is_safe_webhook_url(url: str) -> bool:
         return False
 
 
+def _is_feishu_enabled() -> bool:
+    return bool(get_setting("FEISHU_APP_ID") and get_setting("FEISHU_APP_SECRET"))
+
+
+def _feishu_team_id() -> str:
+    return get_setting("FEISHU_TEAM_ID") or get_setting("FEISHU_TENANT_KEY") or "feishu"
+
+
+def _is_feishu_session() -> bool:
+    return _is_feishu_enabled() and session.get("team_id") == _feishu_team_id()
+
+
+def _db_members_payload(team_id: str) -> list[dict]:
+    rows = db.get_active_members(team_id)
+    return [
+        {
+            "id": r["user_id"],
+            "name": r.get("display_name_override") or r.get("real_name", "") or r["user_id"],
+            "display_name": r.get("display_name_override") or r.get("real_name", "") or r["user_id"],
+            "raw_name": r.get("real_name", "") or r["user_id"],
+            "avatar": "",
+            "email": r.get("email", ""),
+            "tz": r.get("tz", "UTC"),
+            "role": r.get("role", "member"),
+            "tags": r.get("tags") or [],
+        }
+        for r in rows
+    ]
+
+
+def _normalise_member_tags(raw_tags) -> list[str]:
+    if raw_tags is None:
+        return []
+    if isinstance(raw_tags, str):
+        parts = raw_tags.replace("，", ",").split(",")
+    elif isinstance(raw_tags, list):
+        parts = raw_tags
+    else:
+        return []
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        value = str(part or "").strip()
+        if not value:
+            continue
+        folded = value.casefold()
+        if folded in seen:
+            continue
+        seen.add(folded)
+        deduped.append(value)
+    return deduped[:12]
+
+
 # ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
@@ -62,6 +197,9 @@ def _login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not session.get("team_id"):
+            if _dashboard_auth_disabled():
+                _login_internal_dashboard()
+                return f(*args, **kwargs)
             if request.path.startswith("/dashboard/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("dashboard.login"))
@@ -101,6 +239,44 @@ def _get_bot_token() -> str | None:
         return None
 
 
+def _normalise_setting_value(key: str, value) -> str:
+    if key in {"FEISHU_AI_SUMMARY_ENABLED"}:
+        return "true" if bool(value) and str(value).lower() not in {"false", "0", "off", "no"} else "false"
+    return str(value or "").strip()
+
+
+def _read_app_settings_payload() -> dict:
+    try:
+        saved = db.get_app_settings()
+    except Exception:
+        saved = {}
+
+    values = {}
+    secret_state = {}
+    for key in sorted(_SETTING_KEYS):
+        default = _SETTING_DEFAULTS.get(key, "")
+        raw_value = saved[key] if key in saved else os.environ.get(key, default)
+        if key in _SECRET_SETTING_KEYS:
+            values[key] = ""
+            secret_state[key] = bool(raw_value)
+        else:
+            values[key] = raw_value
+    return {"values": values, "secret_set": secret_state}
+
+
+def _refresh_feishu_transport(settings: dict[str, str]) -> None:
+    if not any(key in _FEISHU_TRANSPORT_KEYS for key in settings):
+        return
+    try:
+        from feishu_longconn import feishu_event_mode, feishu_longconn_service  # noqa: PLC0415
+
+        feishu_longconn_service.stop()
+        if _is_feishu_enabled() and feishu_event_mode() == "ws":
+            feishu_longconn_service.start()
+    except Exception as exc:
+        logger.warning("Could not refresh Feishu transport: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Page routes
 # ---------------------------------------------------------------------------
@@ -108,6 +284,10 @@ def _get_bot_token() -> str | None:
 
 @dashboard_bp.route("/dashboard")
 def dashboard():
+    key = request.args.get("key", "")
+    if key and _try_dashboard_key_login(key):
+        return redirect(url_for("dashboard.dashboard"))
+
     # Accept one-time login token from OAuth redirect to bootstrap session
     token = request.args.get("t")
     if token:
@@ -122,6 +302,12 @@ def dashboard():
             except Exception:
                 session["team_name"] = team_id
             return redirect(url_for("dashboard.dashboard"))
+
+    if not session.get("team_id"):
+        if _dashboard_auth_disabled():
+            _login_internal_dashboard()
+        else:
+            return redirect(url_for("dashboard.login"))
 
     if not session.get("team_id"):
         return redirect(url_for("dashboard.login"))
@@ -139,6 +325,17 @@ def dashboard():
 def login():
     if session.get("team_id"):
         return redirect(url_for("dashboard.dashboard"))
+    if _dashboard_auth_disabled():
+        _login_internal_dashboard()
+        return redirect(url_for("dashboard.dashboard"))
+    key = request.args.get("key", "")
+    if key and _try_dashboard_key_login(key):
+        return redirect(url_for("dashboard.dashboard"))
+    if _dashboard_admin_key():
+        return (
+            "<h3>晨序 Dashboard 登录</h3>"
+            "<p>打开 <code>/dashboard/login?key=你的访问密钥</code> 进入。</p>"
+        )
     # Use /install which generates a proper HMAC state
     return redirect(url_for("oauth.install"))
 
@@ -147,6 +344,75 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("dashboard.login"))
+
+
+def _dashboard_auth_disabled() -> bool:
+    return get_setting("DASHBOARD_AUTH", "none").strip().lower() in {"", "none", "off", "false", "0"}
+
+
+def _dashboard_admin_key() -> str:
+    return get_setting("DASHBOARD_ADMIN_KEY") or get_setting("FEISHU_DASHBOARD_ADMIN_KEY")
+
+
+def _try_dashboard_key_login(key: str) -> bool:
+    expected = _dashboard_admin_key()
+    if not expected or not secrets.compare_digest(key, expected):
+        return False
+    _login_internal_dashboard()
+    return True
+
+
+def _login_internal_dashboard() -> None:
+    team_id = _feishu_team_id()
+    user_id = get_setting("FEISHU_ADMIN_OPEN_ID", "").strip() or "admin"
+    session["team_id"] = team_id
+    session["user_id"] = user_id
+    try:
+        if _is_feishu_enabled():
+            from feishu_bootstrap import ensure_feishu_workspace  # noqa: PLC0415
+
+            ensure_feishu_workspace()
+        inst = db.get_installation(team_id)
+        session["team_name"] = inst["team_name"] if inst else get_setting("FEISHU_TEAM_NAME", team_id)
+        db.ensure_admin(team_id, user_id)
+    except Exception:
+        session["team_name"] = get_setting("FEISHU_TEAM_NAME", team_id)
+
+
+def _refresh_schedule_job(team_id: str, schedule: dict | None) -> None:
+    if not schedule:
+        return
+    try:
+        from scheduler import get_scheduler, register_schedule_job  # noqa: PLC0415
+
+        inst = db.get_installation(team_id)
+        sched_obj = get_scheduler()
+        if not inst or not sched_obj:
+            return
+        if schedule.get("active", True):
+            sched_with_token = dict(schedule)
+            sched_with_token["bot_token"] = inst["bot_token"]
+            register_schedule_job(sched_obj, sched_with_token)
+        else:
+            _remove_schedule_jobs(team_id, int(schedule["id"]))
+    except Exception as exc:
+        logger.warning("Could not refresh schedule job: %s", exc)
+
+
+def _remove_schedule_jobs(team_id: str, schedule_id: int) -> None:
+    try:
+        from scheduler import get_scheduler  # noqa: PLC0415
+
+        sched_obj = get_scheduler()
+        if not sched_obj:
+            return
+        for prefix in ("schedule_", "reminder_schedule_", "weekend_reminder_schedule_", "report_schedule_"):
+            try:
+                sched_obj.remove_job(f"{prefix}{team_id}_{schedule_id}")
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.warning("Could not remove schedule jobs: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +511,13 @@ def api_create_standup():
             reminder_minutes=int(data.get("reminder_minutes") or 0),
             post_to_thread=bool(data.get("post_to_thread", False)),
             notify_on_report=bool(data.get("notify_on_report", True)),
-            post_summary=bool(data.get("post_summary", False)),
+            post_summary=bool(data.get("post_summary", data.get("ai_summary_enabled", True))),
+            report_time=data.get("report_time") or None,
+            group_by=data.get("group_by", "member"),
+            ai_summary_enabled=bool(data.get("ai_summary_enabled", False)),
+            ai_provider=data.get("ai_provider", "openai"),
         )
+        _refresh_schedule_job(team_id, row)
         return jsonify(_schedule_to_standup(row)), 201
     except Exception as exc:
         logger.error("api_create_standup error: %s", exc)
@@ -293,6 +564,7 @@ def api_update_standup(standup_id: str):
             kwargs["reminder_minutes"] = int(data.get("reminder_minutes") or 0)
         if "ai_summary_enabled" in data:
             kwargs["ai_summary_enabled"] = bool(data["ai_summary_enabled"])
+            kwargs.setdefault("post_summary", True)
         if "manager_digest_enabled" in data:
             kwargs["manager_digest_enabled"] = bool(data["manager_digest_enabled"])
         if "post_to_thread" in data:
@@ -302,6 +574,8 @@ def api_update_standup(standup_id: str):
         if "post_summary" in data:
             kwargs["post_summary"] = bool(data["post_summary"])
         row = db.update_standup_schedule(team_id, int(standup_id), **kwargs)
+        if row:
+            _refresh_schedule_job(team_id, row)
         return jsonify(_schedule_to_standup(row))
     except Exception as exc:
         logger.error("api_update_standup error: %s", exc)
@@ -314,6 +588,7 @@ def api_delete_standup(standup_id: str):
     team_id = session["team_id"]
     try:
         db.delete_standup_schedule(team_id, int(standup_id))
+        _remove_schedule_jobs(team_id, int(standup_id))
         return jsonify({"ok": True})
     except Exception as exc:
         logger.error("api_delete_standup error: %s", exc)
@@ -344,6 +619,47 @@ def api_me():
     )
 
 
+@dashboard_bp.route("/dashboard/api/settings", methods=["GET"])
+@_login_required
+def api_get_settings():
+    return jsonify(_read_app_settings_payload())
+
+
+@dashboard_bp.route("/dashboard/api/settings", methods=["PUT"])
+@_login_required
+def api_update_settings():
+    data = request.get_json(force=True) or {}
+    incoming = data.get("settings", data)
+    if not isinstance(incoming, dict):
+        return jsonify({"error": "settings must be an object"}), 400
+
+    settings: dict[str, str] = {}
+    for key, value in incoming.items():
+        if key not in _SETTING_KEYS:
+            continue
+        if key in _SECRET_SETTING_KEYS and value == "":
+            continue
+        settings[key] = _normalise_setting_value(key, value)
+
+    clear_secrets = data.get("clear_secrets", [])
+    if isinstance(clear_secrets, list):
+        for key in clear_secrets:
+            if key in _SECRET_SETTING_KEYS:
+                settings[key] = ""
+
+    try:
+        db.set_app_settings(settings)
+        if _is_feishu_enabled():
+            from feishu_bootstrap import ensure_feishu_workspace  # noqa: PLC0415
+
+            ensure_feishu_workspace()
+        _refresh_feishu_transport(settings)
+        return jsonify(_read_app_settings_payload())
+    except Exception as exc:
+        logger.error("api_update_settings error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
 @dashboard_bp.route("/dashboard/api/members/<user_id>/role", methods=["PUT"])
 @_login_required
 @_admin_required
@@ -360,6 +676,33 @@ def api_set_member_role(user_id: str):
         return jsonify({"error": str(exc)}), 500
 
 
+@dashboard_bp.route("/dashboard/api/members/<user_id>", methods=["PUT"])
+@_login_required
+@_admin_required
+def api_update_member_profile(user_id: str):
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    display_name_override = data.get("display_name_override")
+    tags = _normalise_member_tags(data.get("tags"))
+    try:
+        db.update_member_profile(
+            team_id,
+            user_id,
+            display_name_override="" if display_name_override is None else str(display_name_override),
+            tags=tags,
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "user_id": user_id,
+                "display_name_override": str(display_name_override or "").strip(),
+                "tags": tags,
+            }
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 # ---------------------------------------------------------------------------
 # Members API
 # ---------------------------------------------------------------------------
@@ -369,16 +712,51 @@ def api_set_member_role(user_id: str):
 @_login_required
 def api_members():
     team_id = session["team_id"]
+    if _is_feishu_session():
+        channel_id = request.args.get("channel_id")
+        if not channel_id:
+            channel_id = get_setting("FEISHU_DEFAULT_CHAT_ID", "").strip()
+        if _is_placeholder_feishu_chat_id(channel_id):
+            channel_id = ""
+        if channel_id:
+            try:
+                from adapters.feishu_adapter import FeishuAdapter  # noqa: PLC0415
+
+                adapter = FeishuAdapter()
+                for member in adapter.list_chat_members(channel_id):
+                    member_id = member.get("member_id") or member.get("open_id") or member.get("user_id")
+                    if not member_id:
+                        continue
+                    db.upsert_member(
+                        team_id=team_id,
+                        user_id=member_id,
+                        real_name=member.get("name") or member.get("member_id") or member_id,
+                        tz=get_setting("FEISHU_SCHEDULE_TZ", "Asia/Shanghai"),
+                    )
+            except Exception as exc:
+                logger.warning("Could not sync Feishu channel members for %s: %s", channel_id, exc)
+        try:
+            members = [member for member in _db_members_payload(team_id) if not _is_placeholder_feishu_member_id(member["id"])]
+            return jsonify(members)
+        except Exception:
+            return jsonify([])
+
     token = _get_bot_token()
     if not token:
         return jsonify([])
 
     # Build role map from DB
     role_map: dict[str, str] = {}
+    profile_map: dict[str, dict] = {}
     try:
         db_members = db.get_active_members(team_id)
         for r in db_members:
             role_map[r["user_id"]] = r.get("role", "member")
+            profile_map[r["user_id"]] = {
+                "display_name_override": r.get("display_name_override") or "",
+                "real_name": r.get("real_name") or "",
+                "tags": r.get("tags") or [],
+            }
     except Exception as e:
         logger.warning("Unexpected error in api_members loading role map: %s", e)
 
@@ -419,15 +797,24 @@ def api_members():
             if channel_member_ids is not None and uid not in channel_member_ids:
                 continue
             profile = u.get("profile", {})
+            stored = profile_map.get(uid, {})
+            resolved_name = (
+                stored.get("display_name_override")
+                or profile.get("real_name")
+                or u.get("name", "")
+                or uid
+            )
             members.append(
                 {
                     "id": uid,
-                    "name": profile.get("real_name") or u.get("name", ""),
-                    "display_name": profile.get("display_name") or u.get("name", ""),
+                    "name": resolved_name,
+                    "display_name": resolved_name,
+                    "raw_name": profile.get("real_name") or stored.get("real_name") or u.get("name", "") or uid,
                     "avatar": profile.get("image_48", ""),
                     "email": profile.get("email", ""),
                     "tz": u.get("tz", "UTC"),
                     "role": role_map.get(uid, "member"),
+                    "tags": stored.get("tags") or [],
                 }
             )
         return jsonify(members)
@@ -435,19 +822,7 @@ def api_members():
         logger.error("api_members error: %s", exc)
         # Fall back to DB members
         try:
-            rows = db.get_active_members(team_id)
-            return jsonify(
-                [
-                    {
-                        "id": r["user_id"],
-                        "name": r.get("real_name", ""),
-                        "email": r.get("email", ""),
-                        "tz": r.get("tz", "UTC"),
-                        "role": r.get("role", "member"),
-                    }
-                    for r in rows
-                ]
-            )
+            return jsonify(_db_members_payload(team_id))
         except Exception:
             return jsonify([])
 
@@ -456,13 +831,28 @@ def api_members():
 @_login_required
 @_admin_required
 def api_invite_admin():
-    """Look up a Slack user by name/email and grant them admin role."""
+    """Look up or add a user and grant them a role."""
     team_id = session["team_id"]
     data = request.get_json(force=True) or {}
     user_id = data.get("user_id", "").strip()
     role = data.get("role", "admin")
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
+    if _is_feishu_session():
+        try:
+            db.upsert_member(
+                team_id=team_id,
+                user_id=user_id,
+                real_name=data.get("name") or user_id,
+                email=data.get("email") or "",
+                tz=data.get("tz") or get_setting("FEISHU_SCHEDULE_TZ", "Asia/Shanghai"),
+            )
+            db.set_member_role(team_id, user_id, role)
+            return jsonify({"ok": True, "user_id": user_id, "role": role, "name": data.get("name") or user_id})
+        except Exception as exc:
+            logger.error("api_invite_admin feishu error: %s", exc)
+            return jsonify({"error": str(exc)}), 500
+
     token = _get_bot_token()
     if not token:
         return jsonify({"error": "No bot token"}), 500
@@ -497,6 +887,40 @@ def api_invite_admin():
 @dashboard_bp.route("/dashboard/api/channels", methods=["GET"])
 @_login_required
 def api_channels():
+    team_id = session.get("team_id", "")
+    if _is_feishu_session():
+        channels: dict[str, dict] = {}
+        try:
+            from adapters.feishu_adapter import FeishuAdapter  # noqa: PLC0415
+
+            adapter = FeishuAdapter()
+            for chat in adapter.list_chats():
+                _add_feishu_channel(channels, chat.get("chat_id"), chat.get("name"))
+        except Exception as exc:
+            logger.warning("api_channels feishu remote list error: %s", exc)
+        default_chat_id = get_setting("FEISHU_DEFAULT_CHAT_ID", "").strip()
+        if default_chat_id:
+            _add_feishu_channel(channels, default_chat_id, get_setting("FEISHU_DEFAULT_CHAT_NAME", "站会"))
+        try:
+            from feishu_bootstrap import parse_feishu_channels  # noqa: PLC0415
+
+            for c in parse_feishu_channels():
+                _add_feishu_channel(channels, c["id"], c.get("name"))
+        except Exception:
+            pass
+        try:
+            config = db.get_workspace_config(team_id) or {}
+            if config.get("channel_id"):
+                _add_feishu_channel(channels, config["channel_id"], config["channel_id"])
+            for sched in db.get_standup_schedules(team_id):
+                if sched.get("channel_id"):
+                    _add_feishu_channel(channels, sched["channel_id"], sched.get("name") or sched["channel_id"])
+                if sched.get("report_channel"):
+                    _add_feishu_channel(channels, sched["report_channel"], sched["report_channel"])
+        except Exception as exc:
+            logger.warning("api_channels feishu DB fallback error: %s", exc)
+        return jsonify(sorted(channels.values(), key=lambda c: c["name"]))
+
     token = _get_bot_token()
     if not token:
         logger.warning("api_channels: no bot token found for team %s", session.get("team_id"))
@@ -810,18 +1234,14 @@ def api_create_schedule():
             post_to_thread=bool(data.get("post_to_thread", False)),
             notify_on_report=bool(data.get("notify_on_report", True)),
             weekend_reminder=bool(data.get("weekend_reminder", False)),
-            post_summary=bool(data.get("post_summary", False)),
+            post_summary=bool(data.get("post_summary", data.get("ai_summary_enabled", True))),
+            report_channel=data.get("report_channel") or None,
+            report_time=data.get("report_time") or None,
+            group_by=data.get("group_by", "member"),
+            ai_summary_enabled=bool(data.get("ai_summary_enabled", False)),
+            ai_provider=data.get("ai_provider", "openai"),
         )
-        try:
-            from scheduler import get_scheduler, register_schedule_job  # noqa: PLC0415
-
-            inst = db.get_installation(team_id)
-            if inst and get_scheduler():
-                sched_with_token = dict(schedule)
-                sched_with_token["bot_token"] = inst["bot_token"]
-                register_schedule_job(get_scheduler(), sched_with_token)
-        except Exception as exc2:
-            logger.warning("Could not register schedule job live: %s", exc2)
+        _refresh_schedule_job(team_id, schedule)
         return jsonify(schedule), 201
     except Exception as exc:
         logger.error("api_create_schedule: %s", exc)
@@ -847,6 +1267,10 @@ def api_update_schedule(schedule_id: int):
             "active",
             "questions",
             "participants",
+            "report_channel",
+            "report_time",
+            "group_by",
+            "ai_provider",
         ):
             if field in data:
                 kwargs[field] = data[field]
@@ -860,33 +1284,15 @@ def api_update_schedule(schedule_id: int):
             kwargs["weekend_reminder"] = bool(data["weekend_reminder"])
         if "post_summary" in data:
             kwargs["post_summary"] = bool(data["post_summary"])
+        if "ai_summary_enabled" in data:
+            kwargs["ai_summary_enabled"] = bool(data["ai_summary_enabled"])
+            kwargs.setdefault("post_summary", True)
         if "sync_with_channel" in data:
             kwargs["sync_with_channel"] = bool(data["sync_with_channel"])
-        if "group_by" in data:
-            kwargs["group_by"] = data["group_by"]
         schedule = db.update_standup_schedule(team_id, schedule_id, **kwargs)
         if not schedule:
             return jsonify({"error": "Not found"}), 404
-        # Refresh the running scheduler so the new time/days take effect immediately
-        try:
-            from scheduler import get_scheduler, register_schedule_job  # noqa: PLC0415
-
-            inst = db.get_installation(team_id)
-            sched_obj = get_scheduler()
-            if inst and sched_obj:
-                if schedule.get("active", True):
-                    sched_with_token = dict(schedule)
-                    sched_with_token["bot_token"] = inst["bot_token"]
-                    register_schedule_job(sched_obj, sched_with_token)
-                else:
-                    # Deactivated — remove jobs from scheduler
-                    for prefix in ("schedule_", "reminder_schedule_", "weekend_reminder_schedule_"):
-                        try:
-                            sched_obj.remove_job(f"{prefix}{team_id}_{schedule_id}")
-                        except Exception:
-                            pass
-        except Exception as exc2:
-            logger.warning("Could not refresh schedule job in scheduler: %s", exc2)
+        _refresh_schedule_job(team_id, schedule)
         return jsonify(schedule)
     except Exception as exc:
         logger.error("api_update_schedule: %s", exc)
@@ -899,19 +1305,7 @@ def api_delete_schedule(schedule_id: int):
     team_id = session["team_id"]
     try:
         db.delete_standup_schedule(team_id, schedule_id)
-        # Remove jobs from the running scheduler
-        try:
-            from scheduler import get_scheduler  # noqa: PLC0415
-
-            sched_obj = get_scheduler()
-            if sched_obj:
-                for prefix in ("schedule_", "reminder_schedule_", "weekend_reminder_schedule_"):
-                    try:
-                        sched_obj.remove_job(f"{prefix}{team_id}_{schedule_id}")
-                    except Exception:
-                        pass
-        except Exception as exc2:
-            logger.warning("Could not remove schedule job from scheduler: %s", exc2)
+        _remove_schedule_jobs(team_id, schedule_id)
         return jsonify({"ok": True})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -994,7 +1388,7 @@ def api_generate_feed_token():
     team_id = session["team_id"]
     token = secrets.token_urlsafe(24)
     db.upsert_workspace_config(team_id, feed_token=token, feed_public=True)
-    app_url = os.environ.get("APP_URL", "")
+    app_url = get_setting("APP_URL", "http://localhost:3000")
     return jsonify({"token": token, "url": f"{app_url}/feed/{token}"})
 
 
@@ -1010,7 +1404,7 @@ def api_disable_feed():
 @_login_required
 def api_mcp_config():
     team_id = session["team_id"]
-    app_url = os.environ.get("APP_URL", "")
+    app_url = get_setting("APP_URL", "http://localhost:3000")
     return jsonify(
         {
             "team_id": team_id,
@@ -1028,8 +1422,12 @@ def api_mcp_config():
 @_login_required
 def api_get_mcp_keys():
     team_id = session["team_id"]
-    keys = db.get_mcp_keys(team_id)
-    return jsonify({"keys": keys})
+    try:
+        keys = db.get_mcp_keys(team_id)
+        return jsonify({"keys": keys})
+    except Exception as exc:
+        logger.warning("api_get_mcp_keys error: %s", exc)
+        return jsonify({"keys": []})
 
 
 @dashboard_bp.route("/dashboard/api/mcp/keys", methods=["POST"])
