@@ -16,7 +16,7 @@ Example claude_desktop_config.json:
       "mcpServers": {
         "morgenruf": {
           "command": "python",
-          "args": ["/path/to/morgenruf/app/src/mcp_server.py"],
+          "args": ["/path/to/chenxu/app/src/mcp_server.py"],
           "env": {
             "DATABASE_URL": "postgresql://morgenruf:pass@localhost:5432/morgenruf",
             "MCP_TEAM_ID": "TEE0GF0QZ"

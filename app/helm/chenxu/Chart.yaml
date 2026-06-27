@@ -9,12 +9,12 @@ keywords:
   - lark
   - progress
   - dashboard
-home: https://github.com/Jobo16/morgenruf
+home: https://github.com/Jobo16/chenxu
 sources:
-  - https://github.com/Jobo16/morgenruf
+  - https://github.com/Jobo16/chenxu
 maintainers:
   - name: Chenxu Contributors
-    url: https://github.com/Jobo16/morgenruf
+    url: https://github.com/Jobo16/chenxu
 dependencies:
   - name: postgresql
     version: 18.5.16

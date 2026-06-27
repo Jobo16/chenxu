@@ -1341,7 +1341,7 @@ def help_modal() -> dict:
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "Need more help? Visit <https://github.com/Jobo16/morgenruf|晨序 README>.",
+                        "text": "Need more help? Visit <https://github.com/Jobo16/chenxu|晨序 README>.",
                     }
                 ],
             },

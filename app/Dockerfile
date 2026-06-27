@@ -1,6 +1,6 @@
 FROM python:3.14-slim
 
-LABEL org.opencontainers.image.source="https://github.com/Jobo16/morgenruf"
+LABEL org.opencontainers.image.source="https://github.com/Jobo16/chenxu"
 LABEL org.opencontainers.image.title="晨序"
 LABEL org.opencontainers.image.description="Self-hosted Feishu progress collection, dashboard, and publishing system"
 LABEL org.opencontainers.image.licenses="MIT"

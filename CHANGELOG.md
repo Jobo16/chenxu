@@ -30,5 +30,5 @@
 - Dashboard 导航聚焦数据看板、收集进度和定时发布三条核心链路。
 - 进度数据模型收敛为项目、成员、岗位、进度内容、进度日期和更新时间。
 
-[Unreleased]: https://github.com/Jobo16/morgenruf/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Jobo16/morgenruf/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Jobo16/chenxu/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Jobo16/chenxu/releases/tag/v0.1.0

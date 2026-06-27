@@ -9,15 +9,23 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/test.yml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
-  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/lint.yml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/lint.yml/badge.svg" alt="Lint" /></a>
-  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/docker.yaml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/docker.yaml/badge.svg" alt="Docker" /></a>
+  <a href="https://github.com/Jobo16/chenxu/actions/workflows/test.yml"><img src="https://github.com/Jobo16/chenxu/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
+  <a href="https://github.com/Jobo16/chenxu/actions/workflows/lint.yml"><img src="https://github.com/Jobo16/chenxu/actions/workflows/lint.yml/badge.svg" alt="Lint" /></a>
+  <a href="https://github.com/Jobo16/chenxu/actions/workflows/docker.yaml"><img src="https://github.com/Jobo16/chenxu/actions/workflows/docker.yaml/badge.svg" alt="Docker" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
   <img src="https://img.shields.io/badge/Feishu-long%20connection-00B96B" alt="Feishu long connection" />
   <img src="https://img.shields.io/badge/AI-DeepSeek%20%7C%20OpenAI-1AA7EC" alt="AI providers" />
 </p>
 
 晨序把日常进度收集拆成两条清晰链路：机器人私聊成员收集并确认进度，Dashboard 负责查看、修正、追溯和发布快照。它适合公司内部自建使用，默认支持飞书长连接，本地测试不需要公网回调。
+
+## 产品截图
+
+![数据看板](./docs/images/dashboard.png)
+
+![收集进度](./docs/images/collections.png)
+
+![定时发布](./docs/images/publish.png)
 
 ## 产品能力
 

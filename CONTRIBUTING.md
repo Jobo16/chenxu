@@ -6,8 +6,8 @@
 ## 本地开发
 
 ```bash
-git clone https://github.com/Jobo16/morgenruf
-cd morgenruf
+git clone https://github.com/Jobo16/chenxu
+cd chenxu
 
 cd app
 python -m venv .venv
