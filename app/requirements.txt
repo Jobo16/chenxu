@@ -13,5 +13,5 @@ lark-channel-sdk==1.1.0
 PyJWT==2.12.1
 mcp==1.27.0
 redis==7.4.0
-sentry-sdk[flask]==2.57.0
+sentry-sdk[flask]==2.63.0
 gunicorn==25.3.0
