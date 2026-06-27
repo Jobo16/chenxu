@@ -1333,7 +1333,7 @@ def register_handlers(app: App) -> None:
                             "• Reply to a standup DM at any time to start\n"
                             "• Use the *App Home* tab to see your history and settings\n"
                             "• Mention `@晨序` in any channel for help\n\n"
-                            "📖 Full docs: <https://docs.morgenruf.dev|docs.morgenruf.dev>"
+                            "📖 Full docs: <https://github.com/Jobo16/morgenruf|晨序 README>"
                         ),
                     },
                 },

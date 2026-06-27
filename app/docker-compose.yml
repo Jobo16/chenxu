@@ -9,27 +9,24 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: morgenruf
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-morgenruf}
-      POSTGRES_DB: morgenruf
+      POSTGRES_USER: chenxu
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-chenxu}
+      POSTGRES_DB: chenxu
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U morgenruf"]
+      test: ["CMD-SHELL", "pg_isready -U chenxu"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    image: morgenruf/morgenruf:latest
+    image: ghcr.io/jobo16/chenxu:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://morgenruf:${DB_PASSWORD:-morgenruf}@db:5432/morgenruf
-      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
-      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
-      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      DATABASE_URL: postgresql://chenxu:${DB_PASSWORD:-chenxu}@db:5432/chenxu
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:3000}
       DASHBOARD_AUTH: ${DASHBOARD_AUTH:-none}

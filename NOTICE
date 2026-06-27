@@ -1,0 +1,11 @@
+晨序 NOTICE
+
+晨序早期基于 morgenruf/morgenruf 改造而来。原项目以 MIT License
+发布，原始版权归 Morgenruf Contributors 所有。
+
+本项目已面向飞书长连接、团队进度收集、Dashboard 看板和定时发布场景
+进行独立产品化改造。除非另有说明，本项目新增代码与文档版权归
+Chenxu Contributors 所有，并继续以 MIT License 发布。
+
+本项目不是 morgenruf/morgenruf 上游项目的官方版本，也不代表上游项目
+对当前实现、文档或产品方向的认可。

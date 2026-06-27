@@ -200,7 +200,7 @@ def mcp_info():
             "transport": "http",
             "endpoint": request.host_url.rstrip("/") + "/mcp",
             "auth": "Bearer token — generate from your 晨序 dashboard",
-            "docs": "https://docs.morgenruf.dev/mcp.html",
+            "docs": "https://github.com/Jobo16/morgenruf#skills",
             "tools": [t["name"] for t in TOOLS],
         }
     )

@@ -1341,7 +1341,7 @@ def help_modal() -> dict:
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "Need more help? Visit <https://docs.morgenruf.dev|docs.morgenruf.dev> or <https://api.morgenruf.dev/support|contact support>",
+                        "text": "Need more help? Visit <https://github.com/Jobo16/morgenruf|晨序 README>.",
                     }
                 ],
             },

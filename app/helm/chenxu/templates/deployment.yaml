@@ -1,0 +1,225 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chenxu.fullname" . }}
+  labels:
+    {{- include "chenxu.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "chenxu.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "chenxu.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "src/migrate.py"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DATABASE_URL
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: chenxu
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: false
+          env:
+            - name: PORT
+              value: "3000"
+            - name: DASHBOARD_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DASHBOARD_AUTH
+            - name: DASHBOARD_ADMIN_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DASHBOARD_ADMIN_KEY
+            - name: FEISHU_EVENT_MODE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_EVENT_MODE
+            - name: FEISHU_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_APP_ID
+            - name: FEISHU_APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_APP_SECRET
+            - name: FEISHU_VERIFICATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_VERIFICATION_TOKEN
+            - name: FEISHU_TEAM_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_TEAM_ID
+            - name: FEISHU_TEAM_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_TEAM_NAME
+            - name: FEISHU_DEFAULT_CHAT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_DEFAULT_CHAT_ID
+            - name: FEISHU_DEFAULT_CHAT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_DEFAULT_CHAT_NAME
+            - name: FEISHU_CHANNELS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_CHANNELS
+            - name: FEISHU_ADMIN_OPEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_ADMIN_OPEN_ID
+            - name: FEISHU_STANDUP_MEMBERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_STANDUP_MEMBERS
+            - name: FEISHU_SCHEDULE_TIME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_SCHEDULE_TIME
+            - name: FEISHU_SCHEDULE_TZ
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_SCHEDULE_TZ
+            - name: FEISHU_SCHEDULE_DAYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_SCHEDULE_DAYS
+            - name: FEISHU_QUESTIONS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_QUESTIONS_JSON
+            - name: FEISHU_AI_SUMMARY_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_AI_SUMMARY_ENABLED
+            - name: FEISHU_AI_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FEISHU_AI_PROVIDER
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: OPENAI_API_KEY
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DEEPSEEK_API_KEY
+            - name: DEEPSEEK_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DEEPSEEK_BASE_URL
+            - name: DEEPSEEK_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DEEPSEEK_MODEL
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: ANTHROPIC_API_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: DATABASE_URL
+            - name: FLASK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: FLASK_SECRET_KEY
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: RESEND_API_KEY
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: APP_URL
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: SENTRY_DSN
+            - name: SENTRY_ENV
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: SENTRY_ENV
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chenxu.fullname" . }}-secret
+                  key: REDIS_URL
+          volumeMounts:
+            - name: teams-config
+              mountPath: /app/teams.yaml
+              subPath: teams.yaml
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: teams-config
+          configMap:
+            name: {{ include "chenxu.fullname" . }}-teams

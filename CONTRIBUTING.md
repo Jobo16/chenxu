@@ -1,91 +1,84 @@
 # Contributing to 晨序
 
-晨序 is open source and all contributions are welcome — whether that's a bug report, a feature request, documentation improvement, or a pull request. Thank you for taking the time to contribute!
+晨序是面向飞书的自托管团队进度工作流系统。欢迎提交 Bug、改进建议、
+文档修正和实现代码。
 
-## Development setup
+## 本地开发
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/morgenruf/morgenruf
+git clone https://github.com/Jobo16/morgenruf
 cd morgenruf
 
-# 2. Create and activate a Python virtual environment
+cd app
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r app/requirements.txt
-
-# 4. Set up configuration
-cp app/.env.example app/.env
-
-# 5. Run the bot locally
-cd app && python src/main.py
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python src/migrate.py
+python src/main.py
 ```
 
-> You will need a Slack app with the appropriate OAuth scopes and a configured Bot Token. See the README for full Slack app setup instructions.
+Dashboard 地址：
 
-## Project structure
-
+```text
+http://localhost:3000/dashboard
 ```
+
+如需测试完整飞书链路，请在 `.env` 或 Dashboard 的集成设置中配置
+`FEISHU_APP_ID`、`FEISHU_APP_SECRET`，事件接收方式选择长连接。
+
+## 项目结构
+
+```text
 app/
-  src/           # Flask + slack-bolt application source
-  migrations/    # Alembic database migration scripts
-  helm/          # Helm chart for Kubernetes deployment
-website/         # Marketing / docs website source
-brand/           # Logo and brand assets
+  src/          Flask 后端、飞书长连接、Dashboard API
+  frontend/    React Dashboard 源码
+  migrations/  SQL 迁移
+  tests/       Python 测试
+  helm/        Kubernetes Helm chart
 ```
 
-## Making changes
+## 代码规范
 
-**Branch naming:**
+- 新代码优先服务当前产品形态，不为旧平台行为增加兼容层。
+- 保持实现直接、清晰，避免无实际收益的抽象。
+- 不提交密钥、Token、真实 App Secret 或内部群聊/成员 ID。
+- Dashboard 变更需要保持极简中文界面，避免无功能价值的说明文案。
 
-| Type | Prefix | Example |
-|------|--------|---------|
-| New feature | `feat/` | `feat/group-by-question` |
-| Bug fix | `fix/` | `fix/duplicate-standup-dm` |
-| Docs | `docs/` | `docs/helm-deployment-guide` |
-| Refactor | `refactor/` | `refactor/oauth-install-store` |
+## 提交 PR
 
-**Commit messages** follow [Conventional Commits](https://www.conventionalcommits.org):
+1. 从 `main` 创建分支。
+2. 保持提交聚焦，提交信息使用 Conventional Commits。
+3. 涉及功能变更时补充测试或说明本地验证路径。
+4. 打开 PR，按模板填写测试结果和截图。
 
+常用提交示例：
+
+```text
+feat: add publish job filters
+fix: collect only confirmed feishu dm replies
+docs: update feishu setup guide
+chore: refresh helm metadata
 ```
-feat: add weekly summary slash command
-fix: handle missing slack_id gracefully
-docs: update helm deployment guide
-chore: bump slack-bolt to 1.19
-```
 
-## Submitting a PR
-
-1. **Fork** the repository and create your branch from `main`.
-2. **Make your changes**, keeping commits focused and well-described.
-3. **Open a pull request** against `main` using the PR template.
-4. A maintainer will review your PR. Please address any requested changes.
-
-## Running tests
+## 运行测试
 
 ```bash
-python -m pytest
+uv run --with-requirements app/requirements.txt --with pytest --isolated python -m pytest app/tests -q
 ```
 
-> The full test suite is coming soon. In the meantime, please test your changes locally against a real Slack workspace and document what you tested in the PR.
+前端构建：
 
-## Code style
+```bash
+cd app/frontend
+npm install
+npm run build
+```
 
-- Follow [PEP 8](https://peps.python.org/pep-0008/).
-- Type hints are encouraged for new functions.
-- Never commit secrets, tokens, or credentials — use environment variables.
-- Keep functions small and focused; prefer clarity over cleverness.
+## 报告问题
 
-## Reporting bugs
+请使用 GitHub Issue 模板，并包含复现步骤、预期行为、实际行为、部署方式和相关日志。
 
-Please use the [Bug Report issue template](https://github.com/morgenruf/morgenruf/issues/new?template=bug_report.md). Include as much detail as possible: steps to reproduce, expected vs actual behavior, logs, and environment info.
+## 许可证
 
-## Community
-
-Have a question or idea? Start a thread in [GitHub Discussions](https://github.com/morgenruf/morgenruf/discussions) — that's the best place for open-ended conversation.
-
-## License
-
-By contributing to 晨序, you agree that your contributions will be licensed under the [Apache 2.0 License](LICENSE).
+贡献代码默认按 [MIT License](LICENSE) 授权。项目来源和版权说明见 [NOTICE](NOTICE)。

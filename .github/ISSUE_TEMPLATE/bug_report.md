@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a bug in Morgenruf
+about: Report a bug in 晨序
 title: '[Bug] '
 labels: bug
 assignees: ''
@@ -28,7 +28,7 @@ Steps to reproduce the behavior:
 
 ## Environment
 
-- Morgenruf version:
+- 晨序 version:
 - Feishu event mode: long connection / webhook / not using Feishu
 - Deployment: self-hosted / cloud
 - Dashboard auth mode: none / key

@@ -1,85 +1,30 @@
 # 晨序 Roadmap
 
-This roadmap outlines what's been shipped, what's in progress, and what's planned. It's a living document — priorities may shift based on community feedback.
+晨序的路线图围绕一个核心链路展开：通过飞书向成员收集进度，确认后入库，
+再通过 Dashboard 看板和定时发布把数据用起来。
 
-Have an idea? [Open a discussion](https://github.com/morgenruf/morgenruf/discussions/new?category=ideas) or [vote on existing ones](https://github.com/morgenruf/morgenruf/discussions).
+## 已完成
 
----
+- 飞书长连接接收消息事件。
+- 飞书机器人私聊收集进度。
+- AI 整理成员回复，并要求成员确认后写入数据库。
+- 数据看板、收集进度、定时发布、集成设置、Skills 和管理页面。
+- 管理页面支持进度记录筛选、新建、编辑和按日期维护。
+- 成员、群聊和项目基础管理。
+- DeepSeek 与 OpenAI-compatible AI 配置。
 
-## ✅ Shipped
+## 进行中
 
-### v1.0.0 — April 2026
-- Slack OAuth install flow with persistent token store
-- Daily standup DM flow with configurable questions
-- Standup summary posted to channel
-- Web dashboard — manage standups, schedules, team settings
-- Role-based access control (admin / member)
-- Multiple standup schedules per workspace
-- Per-user timezone support
-- Skip today command
-- Reminder notifications
-- Mood tracking
-- Analytics dashboard with participation charts
-- CSV export
-- Weekly digest email
-- Webhook integrations
-- AI standup summary (OpenAI GPT-4o-mini / Anthropic Claude Haiku)
-- Workflow automation rules engine
-- Kudos / peer recognition system
-- 25 pre-built question templates
-- Jira / GitHub / Linear auto-linking
-- MCP server at `/mcp` (Claude, Cursor, GitHub Copilot)
-- Google Chat adapter (Beta)
-- Kubernetes-ready Helm chart
-- Public status page ([status.morgenruf.dev](https://status.morgenruf.dev))
-- Full documentation ([docs.morgenruf.dev](https://docs.morgenruf.dev))
-- 80-test Playwright E2E suite
+- 清理旧产品残余，统一仓库展示、部署配置和运行文档。
+- 继续收敛核心数据模型和进度确认链路。
+- 优化 Dashboard 在项目、成员、时间维度上的分析能力。
 
----
+## 计划中
 
-## 🚧 In Progress
+- 定时发布任务增加更多筛选条件和动作目标。
+- 管理页面增加更完整的快照回滚能力。
+- Skills 包提供稳定版本下载和 CLI 查询接口。
+- 数据备份与恢复工具。
+- 更完善的飞书权限检查和配置诊断。
 
-- **MS Teams adapter** — Bot Framework SDK, Adaptive Cards, Azure AD OAuth
-- **Slack App Directory submission** — listing, screenshots, review
-
----
-
-## 📋 Planned
-
-### v1.1 — Integrations
-- [ ] PagerDuty / OpsGenie on-call awareness (skip standup when on-call)
-- [ ] GitHub PR / issue auto-embed in summaries
-- [ ] Linear cycle sync
-- [ ] Notion standup export
-
-### v1.2 — Collaboration
-- [ ] Team standup templates (Engineering, Design, Support presets)
-- [ ] Threaded replies to standup summaries in Slack
-- [ ] Cross-team blocker visibility dashboard
-- [ ] Public standup feed embeds (iframe)
-
-### v1.3 — Self-hosting UX
-- [ ] One-click Railway / Render deploy button
-- [ ] Docker Compose setup wizard
-- [ ] First-run onboarding wizard (no YAML required)
-- [ ] Admin UI for environment variable management
-
-### v2.0 — Multi-platform
-- [ ] Discord adapter
-- [ ] Microsoft Teams GA (out of beta)
-- [ ] Google Chat GA (out of beta)
-- [ ] Unified cross-platform dashboard
-
----
-
-## 💡 Ideas Under Consideration
-
-- Async video standup integration (Loom, Claap)
-- Mobile push notifications via Slack
-- SAML / SSO for enterprise self-hosters
-- Standup streaks and gamification
-- LLM-powered blocker detection and escalation
-
----
-
-*Last updated: April 2026*
+*Last updated: 2026-06-27*

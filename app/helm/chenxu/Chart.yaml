@@ -1,0 +1,22 @@
+apiVersion: v2
+name: chenxu
+description: Self-hosted Feishu progress collection, dashboard, and publishing system
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - feishu
+  - lark
+  - progress
+  - dashboard
+home: https://github.com/Jobo16/morgenruf
+sources:
+  - https://github.com/Jobo16/morgenruf
+maintainers:
+  - name: Chenxu Contributors
+    url: https://github.com/Jobo16/morgenruf
+dependencies:
+  - name: postgresql
+    version: 18.5.16
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled

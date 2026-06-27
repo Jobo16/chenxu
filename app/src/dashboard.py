@@ -1765,7 +1765,7 @@ def api_mcp_config():
             "team_id": team_id,
             "app_url": app_url,
             "mcp_server_path": "app/src/mcp_server.py",
-            "docs_url": "https://docs.morgenruf.dev/mcp.html",
+            "docs_url": "https://github.com/Jobo16/morgenruf#skills",
         }
     )
 
