@@ -29,10 +29,10 @@ Steps to reproduce the behavior:
 ## Environment
 
 - Morgenruf version:
-- Slack workspace type (free/pro/business+/enterprise):
+- Feishu event mode: long connection / webhook / not using Feishu
 - Deployment: self-hosted / cloud
-- Kubernetes version (if applicable):
-- Helm chart version (if applicable):
+- Dashboard auth mode: none / key
+- AI provider: DeepSeek / OpenAI / none
 
 ## Logs
 

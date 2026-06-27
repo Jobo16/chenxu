@@ -18,9 +18,9 @@ assignees: ''
 
 <!-- Any alternative solutions or features you've considered. -->
 
-## Competitor reference
+## Product reference
 
-<!-- Does [Geekbot](https://geekbot.com) or [Standup & Prosper](https://standupandprosper.com) have this feature? How do they implement it? -->
+<!-- If a similar product or internal workflow has this feature, describe the behavior here. -->
 
 ## Additional context
 

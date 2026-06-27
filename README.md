@@ -1,474 +1,195 @@
 # 晨序
 
-> 让每日进展收集、站会汇总和 AI 总结形成稳定节奏。
+<p align="center">
+  <img src="./app/src/static/logo.png" alt="晨序" width="180" />
+</p>
 
-[![Release](https://img.shields.io/github/v/release/morgenruf/morgenruf?label=latest&color=brightgreen)](https://github.com/morgenruf/morgenruf/releases)
-[![Tests](https://github.com/morgenruf/morgenruf/actions/workflows/test.yml/badge.svg)](https://github.com/morgenruf/morgenruf/actions/workflows/test.yml)
-[![Lint](https://github.com/morgenruf/morgenruf/actions/workflows/lint.yml/badge.svg)](https://github.com/morgenruf/morgenruf/actions/workflows/lint.yml)
-[![codecov](https://codecov.io/gh/morgenruf/morgenruf/branch/main/graph/badge.svg)](https://codecov.io/gh/morgenruf/morgenruf)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>面向团队进度收集、确认、看板和定时发布的自托管工作流系统。</strong>
+</p>
 
-A self-hosted standup bot for Feishu/Lark and Slack. Ask structured daily questions, post formatted summaries to team channels, and keep full ownership of your standup data.
+<p align="center">
+  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/test.yml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/test.yml/badge.svg" alt="Tests" /></a>
+  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/lint.yml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/lint.yml/badge.svg" alt="Lint" /></a>
+  <a href="https://github.com/Jobo16/morgenruf/actions/workflows/docker.yaml"><img src="https://github.com/Jobo16/morgenruf/actions/workflows/docker.yaml/badge.svg" alt="Docker" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/Feishu-long%20connection-00B96B" alt="Feishu long connection" />
+  <img src="https://img.shields.io/badge/AI-DeepSeek%20%7C%20OpenAI-1AA7EC" alt="AI providers" />
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Status](https://img.shields.io/badge/status-operational-brightgreen)](https://status.morgenruf.dev)
-[![Helm](https://img.shields.io/badge/Helm-3.x-blue)](https://helm.sh)
-[![Docker](https://img.shields.io/badge/Docker-DockerHub-blue)](https://hub.docker.com/r/morgenruf/morgenruf)
+晨序把日常进度收集拆成两条清晰链路：机器人私聊成员收集并确认进度，Dashboard 负责查看、修正、追溯和发布快照。它适合公司内部自建使用，默认支持飞书长连接，本地测试不需要公网回调。
 
----
+## 产品能力
 
-## Repository Structure
+- 通过飞书机器人向指定成员私聊收集进度，避免采集群聊噪音。
+- AI 将成员回复整理为结构化进度，并要求成员确认后入库。
+- 数据模型围绕项目、成员、岗位、进度内容、进度日期和更新时间。
+- Dashboard 首屏是数据看板，支持项目、成员和时间维度查看。
+- 管理页面支持筛选、手动新建、编辑进度记录，并保留修改快照。
+- 定时发布可以把指定时间、成员、项目范围的进度快照发到飞书群或 Webhook。
+- AI 汇总仅用于发布开头摘要，主要明细来自数据库，减少幻觉影响。
+- 支持 DeepSeek 与 OpenAI-compatible 接口，DeepSeek 只需配置 Base URL、模型和 Key。
 
-```
-morgenruf/
-├── app/
-│   ├── src/            ← Python bot (Flask + slack-bolt)
-│   ├── migrations/     ← SQL migration files (auto-applied on start)
-│   ├── helm/morgenruf/ ← Production Helm chart
-│   └── Dockerfile
-├── brand/              ← Logo & brand assets
-├── slack-manifest.yaml ← Slack app manifest
-├── CHANGELOG.md
-└── README.md
-```
+## 界面结构
 
----
+核心导航：
 
-## Features
+- `数据看板`：查看团队进度概览、项目分布、成员分布和最近进度。
+- `收集进度`：配置飞书私聊收集任务、参与成员、工作日和提醒内容。
+- `定时发布`：配置进度快照的定时推送目标、范围和 AI 摘要。
 
-- 📅 **Configurable schedule** — per-team times, timezones, and days
-- 💬 **DM-based collection** — bot DMs each member individually
-- ❓ **Custom questions** — fully editable from the dashboard (not hardcoded)
-- ⏭️ **Skip today** — DM `skip` to opt out for the day
-- ⏰ **Pre-standup reminder** — configurable minutes before standup time
-- 🌍 **Per-user timezone** — DM `timezone America/New_York` to set personal timezone
-- 🚧 **Blocker detection** — highlights blockers in summaries
-- 🤖 **Manual trigger** — type `standup` in DM anytime
-- 🎭 **Mood tracking** — 4th question captures team sentiment (😊/😐/😔)
-- 🔗 **Auto-linking** — Jira/GitHub issue references become clickable links
-- 🪝 **Webhooks** — HMAC-signed HTTP webhooks on `standup.completed`
-- ✏️ **Edit window** — members can edit responses within a configurable time window
-- 📊 **Web dashboard** — Analytics tab, participation stats, CSV export
-- 📧 **Welcome email + weekly digest** — via Resend
-- 🏠 **App Home tab** — shows workspace status in Slack Home
-- 🐳 **Kubernetes-ready** — production Helm chart at `charts.morgenruf.dev`
-- ☁️ **Cloudflare Zero Trust** — works behind CF tunnel (no ingress controller needed)
-- 🗃️ **PostgreSQL** — full standup history, migrations auto-applied on startup
+辅助导航：
 
----
+- `集成设置`：配置飞书长连接、默认群聊、管理员、AI 服务和 Key。
+- `Skills`：下载最新 Skills 包。
+- `管理页面`：维护进度记录、成员信息和项目信息。
 
-## Quick Start
+## 快速启动
 
-### 1. Create a Slack App
+### 1. 准备环境
 
-1. Go to [https://api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → From manifest
-2. Paste the manifest from [`slack-manifest.yaml`](./slack-manifest.yaml)
-3. Under **OAuth & Permissions**, add your redirect URL: `https://<your-domain>/oauth/callback`
-4. Copy **Client ID**, **Client Secret**, and **Signing Secret**
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 14+
+- 飞书自建应用，启用机器人能力和事件长连接
 
-### 2. Run locally
+### 2. 配置环境变量
 
 ```bash
 cd app
 cp .env.example .env
-# Fill in SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET, DATABASE_URL
-pip install -r src/requirements.txt
-python src/main.py
 ```
 
-### 3. Deploy to Kubernetes
+最小飞书配置：
 
-See [**Kubernetes Deployment**](#kubernetes-deployment) below.
-
----
-
-## Docker Image
-
-Available on DockerHub: [`morgenruf/morgenruf`](https://hub.docker.com/r/morgenruf/morgenruf)
-
-```bash
-docker pull morgenruf/morgenruf:latest
-```
-
-Also mirrored at `ghcr.io/morgenruf/morgenruf:latest`
-
-### GitHub Actions / CI
-
-The image is automatically built and pushed on every push to `main` and on version tags (`v*`) via `.github/workflows/docker-publish.yml`.
-
-If you fork this repo, add the following secrets under **Settings → Secrets and variables → Actions**:
-
-| Secret | Value |
-|---|---|
-| `DOCKERHUB_USERNAME` | `morgenruf` |
-| `DOCKERHUB_TOKEN` | Your DockerHub access token |
-
-## Docker / Mac Quickstart
-
-The fastest way to run 晨序 locally or on a Mac server.
-
-### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Mac/Linux/Windows)
-- A Slack app — [create one](https://api.slack.com/apps) using the manifest at `slack-manifest.yaml`
-
-### 1. Clone and configure
-
-```bash
-git clone https://github.com/morgenruf/morgenruf
-cd morgenruf/app
-cp .env.example .env
-# Edit .env with your Slack credentials
-```
-
-### 2. Start
-
-```bash
-docker compose up -d
-```
-
-That's it. The bot is now running at `http://localhost:3000`.
-
-### 3. Expose to the internet (required for Slack webhooks)
-
-Slack needs to reach your bot. Options:
-
-**Cloudflare Tunnel (recommended — free, no port forwarding):**
-```bash
-brew install cloudflare/cloudflare/cloudflared
-cloudflared tunnel --url http://localhost:3000
-# Copy the https://xxxx.trycloudflare.com URL
-# Set APP_URL=https://xxxx.trycloudflare.com in .env
-# docker compose restart app
-```
-
-**ngrok:**
-```bash
-ngrok http 3000
-# Copy the https URL and set APP_URL in .env
-```
-
-### 4. Configure your Slack app
-
-Set these URLs in your Slack app settings:
-- **Event Subscriptions Request URL:** `https://your-tunnel-url/slack/events`
-- **OAuth Redirect URL:** `https://your-tunnel-url/oauth/callback`
-- **Interactivity Request URL:** `https://your-tunnel-url/slack/interactions`
-
-Then click **"Add to Slack"** from `https://your-tunnel-url/install`.
-
-### Mac as a permanent server
-
-To run on a Mac Mini or Mac server permanently:
-
-```bash
-# Start on boot
-brew services start docker  # or use Docker Desktop login items
-
-# Keep containers running
-docker compose up -d --restart-policy always
-```
-
----
-
-## 飞书内部机器人
-
-晨序可以不接 Slack，直接作为公司内部飞书机器人使用。
-
-创建飞书自建应用，启用机器人，订阅消息接收事件，并把事件接收方式切到“长连接”。
-
-首次启动只需要保留数据库和会话密钥。飞书、AI、默认群聊、成员、调度等配置都可以在 Dashboard 的「设置」页修改。长连接模式不需要公网事件回调地址，本地开发可以直接连飞书。
-
-```bash
-APP_URL=https://your-domain.com
+```env
+DATABASE_URL=postgresql://morgenruf:morgenruf@localhost:5432/morgenruf
+FLASK_SECRET_KEY=replace-with-a-random-secret
+APP_URL=http://localhost:3000
 DASHBOARD_AUTH=none
 
-FEISHU_APP_ID=cli_xxx
-FEISHU_APP_SECRET=xxx
 FEISHU_EVENT_MODE=ws
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=
 FEISHU_TEAM_ID=feishu
-FEISHU_TEAM_NAME="你的公司"
-FEISHU_DEFAULT_CHAT_ID=oc_xxx
-FEISHU_DEFAULT_CHAT_NAME="研发站会"
-FEISHU_CHANNELS="oc_xxx|研发群,oc_yyy|产品群"
-FEISHU_STANDUP_MEMBERS="ou_xxx|张三|zhangsan@example.com,ou_yyy|李四|lisi@example.com"
-FEISHU_SCHEDULE_TIME=09:30
-FEISHU_SCHEDULE_TZ=Asia/Shanghai
-FEISHU_SCHEDULE_DAYS=mon,tue,wed,thu,fri
-FEISHU_AI_SUMMARY_ENABLED=true
+FEISHU_TEAM_NAME=你的公司
+
 FEISHU_AI_PROVIDER=deepseek
-OPENAI_API_KEY=sk-...
-DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
-如果需要给 Dashboard 加一道简单访问密钥：
+长连接模式不需要配置飞书公网回调地址、`Verification Token` 或 `Encrypt Key`。如果要限制 Dashboard 访问，把 `DASHBOARD_AUTH` 改为 `key` 并设置 `DASHBOARD_ADMIN_KEY`。
 
-```bash
-DASHBOARD_AUTH=key
-DASHBOARD_ADMIN_KEY=generate-a-long-random-secret
-```
-
-所需飞书能力：
-
-- 启用机器人能力
-- 订阅消息事件：`im.message.receive_v1`
-- 机器人发送消息：`im:message`
-- 可选成员信息同步：通讯录用户读取权限
-
-长连接模式下不需要配置事件回调地址，也不需要 `Verification Token` / `Encrypt Key`。如果切回公网回调模式，再把 `FEISHU_EVENT_MODE` 改成 `webhook`，并配置：
-
-```text
-https://your-domain.com/feishu/events
-```
-
-首次启动前执行数据库迁移：
+### 3. 启动后端
 
 ```bash
 cd app
-docker compose up -d db
-docker compose run --rm app python src/migrate.py
-docker compose up -d app
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python src/migrate.py
+python src/main.py
 ```
 
-成员可以回复 `站会` 手动开始，回复 `跳过` 跳过当天，或直接回答定时私聊问题。开启 AI 汇总后，系统会先发送成员明细，再把 AI 总结发到同一个飞书群。AI Key 支持在 Dashboard 设置页配置 `OPENAI_API_KEY`、`DEEPSEEK_API_KEY` 或 `ANTHROPIC_API_KEY`；DeepSeek 使用 OpenAI-compatible 调用格式，默认 Base URL 为 `https://api.deepseek.com`。
-
-打开 Dashboard：
+访问：
 
 ```text
 http://localhost:3000/dashboard
 ```
 
-Dashboard 支持配置飞书长连接、AI Key、控制台访问方式、默认群聊、成员列表，也支持创建/编辑站会调度、选择工作日、跳过周末、设置提醒、选择参与人、开启 AI 汇总、查看和导出历史汇总。
+### 4. 构建前端
 
-## Google Chat (Beta)
-
-晨序 supports Google Chat via the Chat REST API and a service account.
-
-> **Note:** Google Chat bot integration requires **Google Workspace** (not free Gmail accounts).
-
-### Setup
-
-1. **Create a GCP project** at [console.cloud.google.com](https://console.cloud.google.com)
-2. **Enable the Chat API** — _APIs & Services → Library → Google Chat API → Enable_
-3. **Create a service account** — _IAM & Admin → Service Accounts → Create_
-4. **Download the JSON key** for the service account
-5. **Set the env var** — paste the entire JSON as a single line:
-   ```bash
-   GOOGLE_CREDENTIALS='{"type":"service_account","project_id":"...","private_key":"...","client_email":"...",...}'
-   ```
-6. **Configure the bot in Google Chat Admin** — _admin.google.com → Apps → Google Chat → Manage bots_
-   - Set the **Webhook URL** to: `https://your-domain.com/google/events`
-   - Enable _Direct messages_ and _Space messages_
-7. **Restart 晨序** — the Google Chat blueprint is registered automatically when `GOOGLE_CREDENTIALS` is set.
-
-### Commands (in Google Chat DM or Space)
-
-| Command | Description |
-|---------|-------------|
-| `/standup` | Start your daily standup |
-| `/skip` | Skip today's standup |
-| `/help` | Show available commands |
-
----
-
-## Standup Format
-
-The bot DMs each member 4 questions:
-
-```
-✅ What did you complete yesterday?
-🎯 What are you working on today?
-🚧 Any blockers?
-🎭 How are you feeling today? (😊 Great / 😐 Okay / 😔 Struggling)
-```
-
-Then posts a formatted summary to the configured channel:
-
-```
-📋 Standup — Alice  |  April 5, 2026
-
-✅ Yesterday
-  Deployed Terraform module, PR #42 merged
-
-🎯 Today
-  Load balancer configuration
-
-🚧 Blockers
-  Waiting on AWS quota approval
-
-🎭 Mood: 😊
-```
-
----
-
-## DM Commands
-
-| Command | Description |
-|---------|-------------|
-| `standup` | Start your standup now |
-| `skip` | Skip today's standup |
-| `timezone <tz>` | Set your personal timezone (e.g. `timezone Europe/London`) |
-| `help` | Show available commands |
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SLACK_CLIENT_ID` | ✅ | Slack app client ID |
-| `SLACK_CLIENT_SECRET` | ✅ | Slack app client secret |
-| `SLACK_SIGNING_SECRET` | ✅ | Request signing secret |
-| `DATABASE_URL` | ✅ | PostgreSQL connection URL |
-| `APP_URL` | ✅ | Public base URL (e.g. `https://api.morgenruf.dev`) |
-| `FLASK_SECRET_KEY` | ✅ | Random secret for session cookies |
-| `PORT` | | HTTP port (default: `3000`) |
-| `RESEND_API_KEY` | | For welcome emails (optional) |
-
----
-
-## Kubernetes Deployment
-
-晨序 ships a production-ready Helm chart at `app/helm/morgenruf/`.
-
-### Database (recommended: external PostgreSQL)
-
-> **We recommend using an external PostgreSQL instance** rather than the bundled sub-chart.
-> The bundled sub-chart is convenient for testing but adds operational complexity in production.
-> Bitnami images were also removed from Docker Hub, which can cause pull failures.
-
-**Good options:**
-- [CloudNativePG](https://cloudnative-pg.io/) operator (k8s-native)
-- [Supabase](https://supabase.com) / [Neon](https://neon.tech) (managed, free tiers)
-- AWS RDS / Google Cloud SQL / Azure Database
-- Plain `postgres:16` StatefulSet in your cluster
-
-Once you have a database, create the database and user:
-
-```sql
-CREATE DATABASE morgenruf;
-CREATE USER morgenruf WITH PASSWORD 'strongpassword';
-GRANT ALL PRIVILEGES ON DATABASE morgenruf TO morgenruf;
-```
-
-### Install
+修改 Dashboard 前端后执行：
 
 ```bash
-helm repo add morgenruf https://charts.morgenruf.dev
-helm repo update
-
-helm upgrade --install morgenruf morgenruf/morgenruf \
-  --namespace morgenruf \
-  --create-namespace \
-  --set slack.clientId="YOUR_CLIENT_ID" \
-  --set slack.clientSecret="YOUR_CLIENT_SECRET" \
-  --set slack.signingSecret="YOUR_SIGNING_SECRET" \
-  --set externalDatabase.url="postgresql://morgenruf:pass@host:5432/morgenruf" \
-  --set flaskSecretKey="$(openssl rand -hex 32)" \
-  --set app.url="https://api.your-domain.com"
+cd app/frontend
+npm install
+npm run build
 ```
 
-> **Migrations** run automatically as an init container on every pod start — idempotent and safe.
+构建产物会写入 `app/src/static/dashboard/`，由 Flask/Gunicorn 直接提供。
 
-### Cloudflare Zero Trust (no ingress controller)
+## 飞书应用配置
 
-If you use Cloudflare Tunnel instead of an ingress controller:
+在飞书开放平台创建自建应用后，至少需要：
+
+- 启用机器人能力。
+- 事件订阅选择“使用长连接接收事件”。
+- 订阅消息事件 `im.message.receive_v1`。
+- 开通机器人发消息能力。
+- 如需从 Dashboard 同步群聊成员，开通读取通讯录或群成员所需权限。
+
+启动后进入 `集成设置`：
+
+1. 填写 `App ID` 和 `App Secret`。
+2. 事件接收选择 `长连接`。
+3. 点击 `连接飞书` 同步群聊和成员。
+4. 选择默认群聊和管理员。
+5. 配置 DeepSeek 或 OpenAI Key。
+
+## AI 整理流程
+
+成员回复进度后，晨序会把以下上下文交给 AI：
+
+- 成员原始回复和补充对话。
+- 数据库中已有项目名。
+- 成员名称、岗位标签。
+- 该成员上一次提交的进度。
+
+AI 必须返回内部 JSON：`project_name`、`role`、`content`。系统会校验项目名是否存在、内容是否为空，再把人类可读的预览发给成员确认：
+
+```text
+项目：晨序
+岗位：后端
+进度：
+完成飞书长连接收集链路。
+下一步验证 Dashboard 历史记录。
+```
+
+成员回复 `确认` 后才会入库；如果内容不准确，成员继续补充，系统会重新整理。
+
+## 数据与安全
+
+- 飞书事件默认走长连接，不要求本地开发暴露公网回调。
+- App Secret、AI Key、Dashboard Key 不会在设置接口中明文返回。
+- Dashboard 手动修改进度会生成快照，便于追溯和回滚。
+- 进度发布明细来自数据库查询，AI 只生成摘要文本。
+- 建议生产环境使用 PostgreSQL、Redis 和 `DASHBOARD_AUTH=key`。
+
+## 项目结构
+
+```text
+morgenruf/
+├── app/
+│   ├── src/                  # Flask 后端、飞书长连接、调度、Dashboard API
+│   ├── frontend/             # React Dashboard 源码
+│   ├── migrations/           # SQL 迁移
+│   ├── tests/                # Python 测试
+│   ├── docker-compose.yml    # 本地自托管启动配置
+│   └── requirements.txt
+├── .github/                  # CI、Issue、PR 模板
+├── README.md
+└── LICENSE
+```
+
+## 常用命令
 
 ```bash
-# Disable ingress in Helm
---set ingress.enabled=false
+# 后端测试
+uv run --with-requirements app/requirements.txt --with pytest --isolated python -m pytest app/tests -q
 
-# Then add a Public Hostname in Cloudflare Zero Trust dashboard:
-# Hostname: api.your-domain.com
-# Service:  http://morgenruf.morgenruf.svc.cluster.local:3000
+# 前端构建
+cd app/frontend && npm run build
+
+# 数据库迁移
+cd app && ./.venv/bin/python src/migrate.py
+
+# 本地服务
+cd app && ./.venv/bin/python src/main.py
 ```
 
-### values.yaml reference
-
-```yaml
-# Required ─────────────────────────────────────────────
-slack:
-  clientId: ""           # Slack app → Basic Information → Client ID
-  clientSecret: ""       # Slack app → Basic Information → Client Secret (32 chars)
-  signingSecret: ""      # Slack app → Basic Information → Signing Secret
-
-externalDatabase:
-  url: ""                # postgresql://user:pass@host:5432/db
-
-flaskSecretKey: ""       # openssl rand -hex 32
-
-app:
-  url: "https://api.your-domain.com"   # Public HTTPS URL for OAuth redirects
-
-# Optional ─────────────────────────────────────────────
-resend:
-  apiKey: ""             # Resend API key for welcome emails (free tier ok)
-
-ingress:
-  enabled: true          # set false for Cloudflare Tunnel / custom routing
-  className: "nginx"
-  hosts:
-    - host: api.your-domain.com
-```
-
-> ⚠️ **Common mistake:** `slack.clientSecret` and `slack.signingSecret` are **different values**.  
-> Both are found on your Slack app's **Basic Information** page.  
-> — Client Secret: 32 hex chars (e.g. `346a428c78b0d8c84b70e74d12a58ab5`)  
-> — Signing Secret: 32 hex chars, listed separately under "App Credentials"
-
----
-
-## Helm Chart Structure
-
-```
-app/helm/morgenruf/
-├── Chart.yaml
-├── values.yaml
-└── templates/
-    ├── deployment.yaml   ← init container runs migrations
-    ├── service.yaml
-    ├── ingress.yaml
-    ├── configmap.yaml
-    └── secret.yaml
-```
-
----
-
-## Deploy
-
----
-
-## Roadmap
-
-- [x] Multi-workspace Slack OAuth
-- [x] Web dashboard (`/dashboard`)
-- [x] Webhooks with HMAC signing
-- [x] Jira/GitHub auto-linking
-- [x] Edit window for responses
-- [x] Email notifications (Resend)
-- [x] Custom questions
-- [x] Skip today
-- [x] Pre-standup reminders
-- [x] Per-user timezone
-- [x] Mood tracking
-- [x] Analytics dashboard + CSV export
-- [x] Weekly digest email
-- [ ] Multiple standup schedules per workspace
-- [ ] Jira/Linear/GitHub integration
-- [ ] Microsoft Teams support *(coming soon)*
-- [ ] Public REST API
-
----
-
-## License
+## 许可证
 
 [MIT](./LICENSE)
-
----
-
-## Contributing
-
-PRs welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
----

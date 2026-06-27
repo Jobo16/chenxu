@@ -14,7 +14,7 @@
 
 - [ ] Tested locally
 - [ ] Unit tests added/updated
-- [ ] Tested in Slack workspace
+- [ ] Tested with Feishu long connection or Dashboard flow
 
 ## Checklist
 
@@ -29,4 +29,4 @@ Closes #
 
 ## Screenshots
 
-<!-- If this PR includes UI changes (Block Kit, App Home, modals), add screenshots here. -->
+<!-- If this PR includes Dashboard or bot-message UI changes, add screenshots here. -->
