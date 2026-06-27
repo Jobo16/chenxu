@@ -61,6 +61,14 @@ const dayOptions = [
 
 const defaultReminder = "请按“项目 + 已完成/正在做 + 下一步 + 风险阻塞”的格式提交进度。";
 
+function todayInputDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 type CollectionForm = {
   id?: number;
   name: string;
@@ -79,6 +87,7 @@ type ProgressForm = {
   user_id: string;
   project_id: string;
   role: string;
+  progress_date: string;
   content: string;
 };
 
@@ -122,6 +131,7 @@ const emptyProgressForm = (): ProgressForm => ({
   user_id: "",
   project_id: "",
   role: "",
+  progress_date: todayInputDate(),
   content: "",
 });
 
@@ -257,6 +267,7 @@ function App() {
       user_id: entry.user_id,
       project_id: entry.project_id ? String(entry.project_id) : "",
       role: entry.role || "",
+      progress_date: entry.progress_date || todayInputDate(),
       content: entry.content || "",
     });
     setProgressOpen(true);
@@ -540,10 +551,10 @@ function ProgressPage({ members, projects, reloadKey, onCreate, onEdit }: { memb
   return (
     <section className="content-stack">
       <div className="filter-bar">
-        <select value={memberId} onChange={(e) => setMemberId(e.target.value)}><option value="">全部成员</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">全部项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        <label><span>成员</span><select value={memberId} onChange={(e) => setMemberId(e.target.value)}><option value="">全部成员</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+        <label><span>项目</span><select value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">全部项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <label><span>开始日期</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+        <label><span>结束日期</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
         <Button onClick={onCreate} icon={<CirclePlus />}>新建记录</Button>
       </div>
       <Panel title="进度记录">
@@ -720,6 +731,7 @@ function ProgressDialog({ open, onOpenChange, form, setForm, members, projects, 
             <Field label="成员"><select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required><option value="">选择成员</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
             <Field label="项目"><select value={form.project_id} onChange={(e) => set("project_id", e.target.value)}><option value="">未归属项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
             <Field label="岗位"><input value={form.role} onChange={(e) => set("role", e.target.value)} /></Field>
+            <Field label="日期"><input type="date" value={form.progress_date} onChange={(e) => set("progress_date", e.target.value)} required /></Field>
           </div>
           <Field label="进度内容"><textarea value={form.content} onChange={(e) => set("content", e.target.value)} required /></Field>
           <DialogActions />

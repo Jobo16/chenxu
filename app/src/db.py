@@ -614,13 +614,14 @@ def save_progress_entry(
     collection_id: int | None = None,
     project_id: int | None = None,
     role: str = "",
+    progress_date: str | None = None,
     source: str = "feishu_dm",
 ) -> int | None:
     sql = """
         INSERT INTO progress_entries (
-            team_id, collection_id, project_id, user_id, role, content, source, updated_at
+            team_id, collection_id, project_id, user_id, role, progress_date, content, source, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, COALESCE(%s::date, CURRENT_DATE), %s, %s, NOW())
         RETURNING id
     """
     payload = {
@@ -629,6 +630,7 @@ def save_progress_entry(
         "project_id": project_id,
         "user_id": user_id,
         "role": role,
+        "progress_date": progress_date,
         "content": content,
         "source": source,
     }
@@ -642,6 +644,7 @@ def save_progress_entry(
                     project_id,
                     user_id,
                     role,
+                    progress_date,
                     content,
                     source,
                 ),
@@ -699,7 +702,7 @@ def get_progress_entries(
 
 
 def update_progress_entry(team_id: str, entry_id: int, created_by: str = "", **kwargs: Any) -> dict | None:
-    allowed = {"user_id", "project_id", "role", "content"}
+    allowed = {"user_id", "project_id", "role", "progress_date", "content"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return get_progress_entry(team_id, entry_id)

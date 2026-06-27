@@ -558,6 +558,68 @@ class TestApiChannels:
 
 
 # ---------------------------------------------------------------------------
+# /dashboard/api/progress
+# ---------------------------------------------------------------------------
+
+
+class TestApiProgress:
+    def test_create_progress_passes_progress_date(self, authed_client):
+        _db_mock.reset_mock()
+        _db_mock.save_progress_entry.return_value = 42
+        _db_mock.get_progress_entry.return_value = {
+            "id": 42,
+            "user_id": "U789",
+            "content": "完成日期字段。",
+            "progress_date": "2026-06-25",
+        }
+
+        resp = authed_client.post(
+            "/dashboard/api/progress",
+            json={
+                "user_id": "U789",
+                "project_id": 7,
+                "role": "后端",
+                "progress_date": "2026-06-25",
+                "content": "完成日期字段。",
+            },
+        )
+
+        assert resp.status_code == 201
+        _db_mock.save_progress_entry.assert_called_once_with(
+            team_id="T123",
+            user_id="U789",
+            project_id=7,
+            role="后端",
+            progress_date="2026-06-25",
+            content="完成日期字段。",
+            source="dashboard",
+        )
+
+    def test_update_progress_allows_progress_date(self, authed_client):
+        _db_mock.reset_mock()
+        _db_mock.update_progress_entry.return_value = {
+            "id": 42,
+            "user_id": "U789",
+            "content": "修正日期。",
+            "progress_date": "2026-06-26",
+        }
+
+        resp = authed_client.put(
+            "/dashboard/api/progress/42",
+            json={"progress_date": "2026-06-26", "content": "修正日期。"},
+        )
+
+        assert resp.status_code == 200
+        _db_mock.update_progress_entry.assert_called_once_with(
+            "T123",
+            42,
+            created_by="U456",
+            progress_date="2026-06-26",
+            content="修正日期。",
+        )
+
+
+# ---------------------------------------------------------------------------
 # /dashboard/api/stats
 # ---------------------------------------------------------------------------
 

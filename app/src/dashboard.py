@@ -930,6 +930,7 @@ def api_create_progress():
             user_id=user_id,
             project_id=data.get("project_id"),
             role=data.get("role") or "",
+            progress_date=data.get("progress_date") or None,
             content=content,
             source="dashboard",
         )
