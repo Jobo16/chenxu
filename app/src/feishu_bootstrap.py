@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 
-from app_settings import get_bool_setting, get_setting
+from app_settings import get_setting
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +63,6 @@ def ensure_feishu_workspace() -> None:
             config["schedule_days"] = get_setting("FEISHU_SCHEDULE_DAYS")
         if get_setting("FEISHU_QUESTIONS_JSON"):
             config["questions"] = json.loads(get_setting("FEISHU_QUESTIONS_JSON"))
-        if get_bool_setting("FEISHU_AI_SUMMARY_ENABLED"):
-            config["ai_summary_enabled"] = True
-            config["ai_provider"] = get_setting("FEISHU_AI_PROVIDER", "openai")
-
         db.upsert_workspace_config(team_id, **config)
         for member in _parse_members(get_setting("FEISHU_STANDUP_MEMBERS", "")):
             db.upsert_member(team_id, **member)

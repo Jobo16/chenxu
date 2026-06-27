@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Standup Report — {{ config.get('standup_name', 'Team Standup') }}</title>
+  <title>进度快照 — 晨序</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -139,51 +139,39 @@
 
 <div class="header">
   <div class="header-inner">
-    <div class="workspace-name">{{ config.get('standup_name', 'Team Standup') }}</div>
-    <div class="report-title">Standup Report</div>
+    <div class="workspace-name">晨序</div>
+    <div class="report-title">进度快照</div>
     <div class="report-date">{{ today }}</div>
   </div>
 </div>
 
 <div class="content">
-  {% if standups %}
-    {% for s in standups %}
+  {% if entries %}
+    {% for s in entries %}
     <div class="card">
       <div class="card-header">
-        <div class="avatar">{{ (s.get('user_name') or s.get('user_id', '?'))[0] | upper }}</div>
+        <div class="avatar">{{ (s.get('member_name') or s.get('user_id', '?'))[0] | upper }}</div>
         <div>
-          <div class="user-name">{{ s.get('user_name') or s.get('user_id', 'Unknown') }}</div>
+          <div class="user-name">{{ s.get('member_name') or s.get('user_id', 'Unknown') }}</div>
           {% if s.get('submitted_at') %}
-          <div class="submitted-at">Submitted at {{ s['submitted_at'].strftime('%H:%M') if s['submitted_at'] else '' }}</div>
+          <div class="submitted-at">{{ s['submitted_at'].strftime('%H:%M') if s['submitted_at'] else '' }}</div>
           {% endif %}
         </div>
       </div>
       <div class="fields">
         <div>
-          <div class="field-label">Yesterday</div>
-          <div class="field-value">{{ s.get('yesterday') or '—' }}</div>
+          <div class="field-label">项目</div>
+          <div class="field-value">{{ s.get('project_name') or '未归属项目' }}</div>
         </div>
-        <div>
-          <div class="field-label">Today</div>
-          <div class="field-value">{{ s.get('today') or '—' }}</div>
-        </div>
-        {% set b = s.get('blockers', '') %}
-        {% if b and b.strip().lower() not in ('', 'none', 'n/a', 'no', '-') %}
         <div class="blocker-field blocker-box">
-          <div class="field-label blocker-label">⚠️ Blockers</div>
-          <div class="field-value blocker-value">{{ b }}</div>
+          <div class="field-label blocker-label">进度</div>
+          <div class="field-value blocker-value">{{ s.get('content') or '—' }}</div>
         </div>
-        {% else %}
-        <div>
-          <div class="field-label">Blockers</div>
-          <div class="field-value">None</div>
-        </div>
-        {% endif %}
       </div>
     </div>
     {% endfor %}
   {% else %}
-    <div class="empty-state">No standup responses yet for today.</div>
+    <div class="empty-state">今天还没有进度记录。</div>
   {% endif %}
 </div>
 

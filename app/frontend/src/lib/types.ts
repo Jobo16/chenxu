@@ -1,13 +1,18 @@
+import type { ReactNode } from "react";
+
 export type SectionId =
-  | "standups"
-  | "members"
-  | "reports"
-  | "analytics"
-  | "settings"
-  | "webhooks"
-  | "kudos"
-  | "automation"
-  | "mcp";
+  | "dashboard"
+  | "collections"
+  | "publish"
+  | "integrations"
+  | "skills"
+  | "manage";
+
+export type NavItem = {
+  id: SectionId;
+  label: string;
+  icon: ReactNode;
+};
 
 export type Member = {
   id: string;
@@ -26,7 +31,14 @@ export type Channel = {
   name: string;
 };
 
-export type Standup = {
+export type Project = {
+  id: number;
+  name: string;
+  description?: string;
+  status?: string;
+};
+
+export type ProgressCollection = {
   id: number;
   name: string;
   channel_id: string;
@@ -34,28 +46,50 @@ export type Standup = {
   schedule_tz: string;
   schedule_days: string[];
   questions: string[];
-  active: boolean;
   participants: string[];
   reminder_minutes: number;
-  report_channel?: string;
-  report_time?: string;
-  group_by?: string;
-  post_as?: string;
-  sort_order?: string;
-  edit_window?: string;
-  display_avatar?: boolean;
-  jira_base_url?: string;
-  zendesk_base_url?: string;
-  github_repo?: string;
-  linear_team?: string;
-  ai_summary_enabled?: boolean;
-  ai_provider?: string;
-  feed_public?: boolean;
-  manager_email?: string;
-  manager_digest_enabled?: boolean;
-  post_to_thread?: boolean;
-  notify_on_report?: boolean;
-  post_summary?: boolean;
+  active: boolean;
+};
+
+export type ProgressEntry = {
+  id: number;
+  user_id: string;
+  member_name?: string;
+  project_id?: number;
+  project_name?: string;
+  role?: string;
+  progress_date?: string;
+  content?: string;
+  submitted_at?: string;
+  updated_at?: string;
+};
+
+export type PublishJob = {
+  id: number;
+  name: string;
+  destination_type: "feishu_channel" | "webhook" | string;
+  destination: string;
+  schedule_time: string;
+  schedule_tz: string;
+  schedule_days: string[] | string;
+  range_days: number;
+  member_ids?: string[];
+  project_ids?: number[];
+  ai_summary_enabled: boolean;
+  ai_provider: string;
+  ai_prompt?: string;
+  active: boolean;
+};
+
+export type DataBoard = {
+  total_entries: number;
+  active_members: number;
+  active_projects: number;
+  updated_today: number;
+  by_project: Array<{ name: string; count: number }>;
+  by_member: Array<{ name: string; count: number }>;
+  by_date: Array<{ date: string; count: number }>;
+  recent_entries: ProgressEntry[];
 };
 
 export type SettingsPayload = {
@@ -70,37 +104,8 @@ export type Me = {
   role: string;
 };
 
-export type Stats = {
-  completion_rate: number;
-  active_members: number;
-  total_responses: number;
-};
-
-export type ReportsPayload = {
-  standups?: Array<Record<string, string>>;
-  participation?: Array<Record<string, string | number>>;
-  total_days?: number;
-};
-
-export type Webhook = {
-  id: number;
-  url: string;
-  created_at?: string;
-};
-
-export type AutomationRule = {
-  id: number;
-  name: string;
-  trigger_type: string;
-  action_type: string;
-  target: string;
-  active?: boolean;
-};
-
-export type McpKey = {
-  id: number;
-  name: string;
-  prefix?: string;
-  created_at?: string;
-  last_used_at?: string;
+export type SkillsPackage = {
+  version: string;
+  filename: string;
+  download_url: string;
 };

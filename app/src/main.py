@@ -1,4 +1,4 @@
-"""Standup bot — multi-workspace entry point."""
+"""晨序 — team progress collection and publishing entry point."""
 
 from __future__ import annotations
 
@@ -171,7 +171,7 @@ def create_app() -> tuple[App, Flask]:
 if __name__ == "__main__":
     _, flask_app = create_app()
     port = int(os.environ.get("PORT", "3000"))
-    logger.info("Starting standup bot on port %d", port)
+    logger.info("Starting 晨序 on port %d", port)
 
     # Use gunicorn in production, Flask dev server only when DEBUG
     if _env_flag("FLASK_DEBUG") or os.environ.get("LOG_LEVEL", "").upper() == "DEBUG":

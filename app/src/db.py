@@ -413,6 +413,453 @@ def get_today_standups(team_id: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Progress product model
+# ---------------------------------------------------------------------------
+
+
+def _json_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except json.JSONDecodeError:
+            return []
+    return []
+
+
+def _progress_collection_payload(row: dict) -> dict:
+    raw_days = row.get("schedule_days") or "mon,tue,wed,thu,fri"
+    return {
+        "id": row["id"],
+        "name": row.get("name") or "每日进度收集",
+        "channel_id": row.get("channel_id") or "",
+        "schedule_time": row.get("schedule_time") or "09:30",
+        "schedule_tz": row.get("schedule_tz") or "Asia/Shanghai",
+        "schedule_days": raw_days.split(",") if isinstance(raw_days, str) else raw_days,
+        "questions": _json_list(row.get("questions")),
+        "participants": row.get("participants") or [],
+        "reminder_minutes": int(row.get("reminder_minutes") or 0),
+        "active": bool(row.get("active", True)),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
+def get_progress_collections(team_id: str) -> list[dict]:
+    sql = "SELECT * FROM progress_collections WHERE team_id = %s ORDER BY created_at"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id,))
+            rows = cur.fetchall()
+    return [_progress_collection_payload(dict(r)) for r in rows]
+
+
+def get_progress_collection(team_id: str, collection_id: int) -> dict | None:
+    sql = "SELECT * FROM progress_collections WHERE team_id = %s AND id = %s"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id, collection_id))
+            row = cur.fetchone()
+    return _progress_collection_payload(dict(row)) if row else None
+
+
+def get_progress_collection_for_user(team_id: str, user_id: str) -> dict | None:
+    sql = """
+        SELECT * FROM progress_collections
+        WHERE team_id = %s
+          AND active = TRUE
+          AND (%s = ANY(participants) OR COALESCE(array_length(participants, 1), 0) = 0)
+        ORDER BY created_at
+        LIMIT 1
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id, user_id))
+            row = cur.fetchone()
+    return _progress_collection_payload(dict(row)) if row else None
+
+
+def create_progress_collection(team_id: str, **kwargs: Any) -> dict:
+    allowed = {
+        "name",
+        "channel_id",
+        "schedule_time",
+        "schedule_tz",
+        "schedule_days",
+        "questions",
+        "participants",
+        "reminder_minutes",
+        "active",
+    }
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if "questions" in fields and isinstance(fields["questions"], list):
+        fields["questions"] = json.dumps(fields["questions"])
+    if "schedule_days" in fields and isinstance(fields["schedule_days"], list):
+        fields["schedule_days"] = ",".join(fields["schedule_days"])
+    cols = ", ".join(fields.keys())
+    placeholders = ", ".join(["%s"] * len(fields))
+    sql = f"""
+        INSERT INTO progress_collections (team_id, {cols}, updated_at)
+        VALUES (%s, {placeholders}, NOW())
+        RETURNING *
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, [team_id] + list(fields.values()))
+            row = cur.fetchone()
+    return _progress_collection_payload(dict(row))
+
+
+def update_progress_collection(team_id: str, collection_id: int, **kwargs: Any) -> dict | None:
+    allowed = {
+        "name",
+        "channel_id",
+        "schedule_time",
+        "schedule_tz",
+        "schedule_days",
+        "questions",
+        "participants",
+        "reminder_minutes",
+        "active",
+    }
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return get_progress_collection(team_id, collection_id)
+    if "questions" in fields and isinstance(fields["questions"], list):
+        fields["questions"] = json.dumps(fields["questions"])
+    if "schedule_days" in fields and isinstance(fields["schedule_days"], list):
+        fields["schedule_days"] = ",".join(fields["schedule_days"])
+    set_clause = ", ".join(f"{k} = %s" for k in fields) + ", updated_at = NOW()"
+    sql = f"UPDATE progress_collections SET {set_clause} WHERE team_id = %s AND id = %s RETURNING *"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, list(fields.values()) + [team_id, collection_id])
+            row = cur.fetchone()
+    return _progress_collection_payload(dict(row)) if row else None
+
+
+def delete_progress_collection(team_id: str, collection_id: int) -> bool:
+    sql = "DELETE FROM progress_collections WHERE team_id = %s AND id = %s"
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (team_id, collection_id))
+            return cur.rowcount > 0
+
+
+def get_projects(team_id: str) -> list[dict]:
+    sql = "SELECT * FROM projects WHERE team_id = %s ORDER BY status, name"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id,))
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def upsert_project(team_id: str, name: str, description: str = "", status: str = "active") -> dict:
+    sql = """
+        INSERT INTO projects (team_id, name, description, status, updated_at)
+        VALUES (%s, %s, %s, %s, NOW())
+        ON CONFLICT (team_id, name) DO UPDATE SET
+            description = EXCLUDED.description,
+            status = EXCLUDED.status,
+            updated_at = NOW()
+        RETURNING *
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id, name.strip(), description.strip(), status.strip() or "active"))
+            row = cur.fetchone()
+    return dict(row)
+
+
+def update_project(team_id: str, project_id: int, name: str, description: str = "", status: str = "active") -> dict | None:
+    sql = """
+        UPDATE projects
+        SET name = %s, description = %s, status = %s, updated_at = NOW()
+        WHERE team_id = %s AND id = %s
+        RETURNING *
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (name.strip(), description.strip(), status.strip() or "active", team_id, project_id))
+            row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def _create_progress_snapshot(
+    team_id: str,
+    entry_id: int,
+    snapshot_type: str,
+    payload: dict,
+    created_by: str = "",
+) -> None:
+    sql = """
+        INSERT INTO progress_entry_snapshots (team_id, entry_id, snapshot_type, payload, created_by)
+        VALUES (%s, %s, %s, %s, %s)
+    """
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (team_id, entry_id, snapshot_type, json.dumps(payload, default=str), created_by))
+
+
+def save_progress_entry(
+    *,
+    team_id: str,
+    user_id: str,
+    content: str,
+    collection_id: int | None = None,
+    project_id: int | None = None,
+    role: str = "",
+    source: str = "feishu_dm",
+) -> int | None:
+    sql = """
+        INSERT INTO progress_entries (
+            team_id, collection_id, project_id, user_id, role, content, source, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        RETURNING id
+    """
+    payload = {
+        "team_id": team_id,
+        "collection_id": collection_id,
+        "project_id": project_id,
+        "user_id": user_id,
+        "role": role,
+        "content": content,
+        "source": source,
+    }
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    team_id,
+                    collection_id,
+                    project_id,
+                    user_id,
+                    role,
+                    content,
+                    source,
+                ),
+            )
+            row = cur.fetchone()
+    entry_id = row[0] if row else None
+    if entry_id:
+        _create_progress_snapshot(team_id, entry_id, "create", payload, user_id)
+    return entry_id
+
+
+def get_progress_entries(
+    team_id: str,
+    *,
+    days: int = 30,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    user_id: str | None = None,
+    project_id: int | None = None,
+) -> list[dict]:
+    conditions = ["e.team_id = %s"]
+    params: list[Any] = [team_id]
+    if from_date:
+        conditions.append("e.progress_date >= %s")
+        params.append(from_date)
+    if to_date:
+        conditions.append("e.progress_date <= %s")
+        params.append(to_date)
+    if not from_date and not to_date:
+        conditions.append("e.progress_date >= CURRENT_DATE - ((%s - 1) * INTERVAL '1 day')")
+        params.append(days)
+    if user_id:
+        conditions.append("e.user_id = %s")
+        params.append(user_id)
+    if project_id:
+        conditions.append("e.project_id = %s")
+        params.append(project_id)
+    sql = f"""
+        SELECT
+            e.*,
+            COALESCE(NULLIF(m.display_name_override, ''), NULLIF(m.real_name, ''), e.user_id) AS member_name,
+            m.tags AS member_tags,
+            p.name AS project_name
+        FROM progress_entries e
+        LEFT JOIN members m ON m.team_id = e.team_id AND m.user_id = e.user_id
+        LEFT JOIN projects p ON p.id = e.project_id
+        WHERE {" AND ".join(conditions)}
+        ORDER BY e.progress_date DESC, e.submitted_at DESC
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_progress_entry(team_id: str, entry_id: int, created_by: str = "", **kwargs: Any) -> dict | None:
+    allowed = {"user_id", "project_id", "role", "content"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return get_progress_entry(team_id, entry_id)
+    before = get_progress_entry(team_id, entry_id)
+    if not before:
+        return None
+    set_clause = ", ".join(f"{k} = %s" for k in fields) + ", updated_at = NOW()"
+    sql = f"UPDATE progress_entries SET {set_clause} WHERE team_id = %s AND id = %s RETURNING *"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, list(fields.values()) + [team_id, entry_id])
+            row = cur.fetchone()
+    after = dict(row) if row else None
+    if after:
+        _create_progress_snapshot(team_id, entry_id, "update", {"before": before, "after": after}, created_by)
+    return after
+
+
+def get_progress_entry(team_id: str, entry_id: int) -> dict | None:
+    rows = get_progress_entries(team_id, days=3650)
+    for row in rows:
+        if int(row["id"]) == int(entry_id):
+            return row
+    return None
+
+
+def get_progress_snapshots(team_id: str, entry_id: int) -> list[dict]:
+    sql = """
+        SELECT * FROM progress_entry_snapshots
+        WHERE team_id = %s AND entry_id = %s
+        ORDER BY created_at DESC
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id, entry_id))
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_previous_progress_entry(team_id: str, user_id: str) -> dict | None:
+    sql = """
+        SELECT * FROM progress_entries
+        WHERE team_id = %s AND user_id = %s
+        ORDER BY submitted_at DESC
+        LIMIT 1
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id, user_id))
+            row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def get_data_board(team_id: str, days: int = 7) -> dict:
+    entries = get_progress_entries(team_id, days=days)
+    members = [m for m in get_active_members(team_id) if m.get("user_id") != "admin"]
+    projects = get_projects(team_id)
+    by_project: dict[str, int] = {}
+    by_member: dict[str, int] = {}
+    by_date: dict[str, int] = {}
+    for row in entries:
+        project_name = row.get("project_name") or "未归属项目"
+        member_name = row.get("member_name") or row.get("user_id")
+        date_key = str(row.get("progress_date"))
+        by_project[project_name] = by_project.get(project_name, 0) + 1
+        by_member[member_name] = by_member.get(member_name, 0) + 1
+        by_date[date_key] = by_date.get(date_key, 0) + 1
+    return {
+        "total_entries": len(entries),
+        "active_members": len(members),
+        "active_projects": len([p for p in projects if p.get("status") == "active"]),
+        "updated_today": len([e for e in entries if str(e.get("progress_date")) == str(__import__("datetime").date.today())]),
+        "by_project": [{"name": k, "count": v} for k, v in sorted(by_project.items())],
+        "by_member": [{"name": k, "count": v} for k, v in sorted(by_member.items())],
+        "by_date": [{"date": k, "count": v} for k, v in sorted(by_date.items())],
+        "recent_entries": entries[:10],
+    }
+
+
+def get_publish_jobs(team_id: str) -> list[dict]:
+    sql = "SELECT * FROM publish_jobs WHERE team_id = %s ORDER BY created_at"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (team_id,))
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_publish_job(team_id: str, **kwargs: Any) -> dict:
+    allowed = {
+        "name",
+        "destination_type",
+        "destination",
+        "schedule_time",
+        "schedule_tz",
+        "schedule_days",
+        "range_days",
+        "member_ids",
+        "project_ids",
+        "ai_summary_enabled",
+        "ai_provider",
+        "ai_prompt",
+        "active",
+    }
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if "schedule_days" in fields and isinstance(fields["schedule_days"], list):
+        fields["schedule_days"] = ",".join(fields["schedule_days"])
+    cols = ", ".join(fields.keys())
+    placeholders = ", ".join(["%s"] * len(fields))
+    sql = f"""
+        INSERT INTO publish_jobs (team_id, {cols}, updated_at)
+        VALUES (%s, {placeholders}, NOW())
+        RETURNING *
+    """
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, [team_id] + list(fields.values()))
+            row = cur.fetchone()
+    return dict(row)
+
+
+def update_publish_job(team_id: str, job_id: int, **kwargs: Any) -> dict | None:
+    allowed = {
+        "name",
+        "destination_type",
+        "destination",
+        "schedule_time",
+        "schedule_tz",
+        "schedule_days",
+        "range_days",
+        "member_ids",
+        "project_ids",
+        "ai_summary_enabled",
+        "ai_provider",
+        "ai_prompt",
+        "active",
+    }
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return None
+    if "schedule_days" in fields and isinstance(fields["schedule_days"], list):
+        fields["schedule_days"] = ",".join(fields["schedule_days"])
+    set_clause = ", ".join(f"{k} = %s" for k in fields) + ", updated_at = NOW()"
+    sql = f"UPDATE publish_jobs SET {set_clause} WHERE team_id = %s AND id = %s RETURNING *"
+    with db_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, list(fields.values()) + [team_id, job_id])
+            row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def delete_publish_job(team_id: str, job_id: int) -> bool:
+    sql = "DELETE FROM publish_jobs WHERE team_id = %s AND id = %s"
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (team_id, job_id))
+            return cur.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
 # Dashboard stats
 # ---------------------------------------------------------------------------
 
@@ -677,17 +1124,12 @@ def get_member_email(team_id: str, user_id: str) -> str | None:
 
 
 def get_standup_schedules(team_id: str) -> list[dict]:
-    """Return all standup schedules for a workspace (includes paused)."""
-    sql = "SELECT * FROM standup_schedules WHERE team_id = %s ORDER BY created_at"
-    with db_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, (team_id,))
-            rows = cur.fetchall()
-    return [dict(r) for r in rows]
+    """Compatibility wrapper for progress collection tasks."""
+    return get_progress_collections(team_id)
 
 
 def create_standup_schedule(team_id: str, **kwargs) -> dict:
-    """Insert a new standup schedule row and return it."""
+    """Compatibility wrapper for progress collection tasks."""
     allowed = {
         "name",
         "channel_id",
@@ -698,34 +1140,9 @@ def create_standup_schedule(team_id: str, **kwargs) -> dict:
         "participants",
         "reminder_minutes",
         "active",
-        "post_to_thread",
-        "notify_on_report",
-        "weekend_reminder",
-        "report_channel",
-        "report_time",
-        "sync_with_channel",
-        "group_by",
-        "prepopulate_answers",
-        "allow_edit_after_report",
-        "post_summary",
-        "ai_summary_enabled",
-        "ai_provider",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
-    if "questions" in fields and isinstance(fields["questions"], list):
-        fields["questions"] = json.dumps(fields["questions"])
-    cols = ", ".join(fields.keys())
-    placeholders = ", ".join(["%s"] * len(fields))
-    sql = f"""
-        INSERT INTO standup_schedules (team_id, {cols}, updated_at)
-        VALUES (%s, {placeholders}, NOW())
-        RETURNING *
-    """
-    with db_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, [team_id] + list(fields.values()))
-            row = cur.fetchone()
-    return dict(row)
+    return create_progress_collection(team_id, **fields)
 
 
 def upsert_daily_thread(
@@ -766,111 +1183,27 @@ def get_daily_thread_ts(team_id: str, channel_id: str, thread_date: str, schedul
 
 
 def get_schedule_for_user(team_id: str, user_id: str) -> dict | None:
-    """Return the active schedule the user is most likely currently doing.
-
-    When a user is in one schedule this is unambiguous. When they are in several
-    (e.g. morning + evening standups, or multiple teams), pick the schedule whose
-    `schedule_time` most recently passed in its own timezone — that is almost
-    always the standup the user is filling out right now. Falls back to the
-    oldest schedule if none has a time within the past 2 hours.
-
-    Used when a standup is started outside the scheduled DM (e.g. user typed
-    "standup" in DM, clicked App Home's Start button, or ran /standup) so the
-    session posts to the correct channel instead of some other schedule's channel.
-    """
-    sql = """
-        SELECT * FROM standup_schedules
-        WHERE team_id = %s
-          AND active = TRUE
-          AND %s = ANY(participants)
-        ORDER BY created_at
-    """
-    with db_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            try:
-                cur.execute(sql, (team_id, user_id))
-            except Exception:
-                return None
-            rows = cur.fetchall() or []
-    if not rows:
-        return None
-    schedules = [dict(r) for r in rows]
-    if len(schedules) == 1:
-        return schedules[0]
-
-    # Multiple schedules — prefer the one whose scheduled time has most recently
-    # passed within the last 2 hours in the schedule's own timezone.
-    from datetime import datetime  # noqa: PLC0415
-
-    import pytz  # noqa: PLC0415
-
-    best = None
-    best_age_min: float | None = None
-    for sched in schedules:
-        tz_name = sched.get("schedule_tz") or "UTC"
-        time_str = sched.get("schedule_time") or ""
-        try:
-            tz = pytz.timezone(tz_name)
-            now_local = datetime.now(tz)
-            hh, mm = time_str.split(":")
-            sched_today = now_local.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
-        except Exception:
-            continue
-        age_min = (now_local - sched_today).total_seconds() / 60.0
-        # Prefer schedules whose time has passed within the last 2 hours.
-        if 0 <= age_min <= 120 and (best_age_min is None or age_min < best_age_min):
-            best = sched
-            best_age_min = age_min
-    return best or schedules[0]
+    """Compatibility wrapper for progress collection tasks."""
+    return get_progress_collection_for_user(team_id, user_id)
 
 
 def get_standup_schedule_for_channel(team_id: str, channel_id: str) -> dict | None:
-    """Return the active standup schedule for a given channel (scoped to team_id).
-
-    When a channel has multiple active schedules (e.g. morning + evening standups),
-    prefer the one whose `schedule_time` most recently passed within the last 2 hours
-    in its own timezone. Falls back to the oldest schedule otherwise.
-    """
+    """Return the active progress collection for a channel."""
     sql = """
-        SELECT * FROM standup_schedules
+        SELECT * FROM progress_collections
         WHERE team_id = %s AND channel_id = %s AND active = TRUE
         ORDER BY created_at
+        LIMIT 1
     """
     with db_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, (team_id, channel_id))
-            rows = cur.fetchall() or []
-    if not rows:
-        return None
-    schedules = [dict(r) for r in rows]
-    if len(schedules) == 1:
-        return schedules[0]
-
-    from datetime import datetime  # noqa: PLC0415
-
-    import pytz  # noqa: PLC0415
-
-    best = None
-    best_age_min: float | None = None
-    for sched in schedules:
-        tz_name = sched.get("schedule_tz") or "UTC"
-        time_str = sched.get("schedule_time") or ""
-        try:
-            tz = pytz.timezone(tz_name)
-            now_local = datetime.now(tz)
-            hh, mm = time_str.split(":")
-            sched_today = now_local.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
-        except Exception:
-            continue
-        age_min = (now_local - sched_today).total_seconds() / 60.0
-        if 0 <= age_min <= 120 and (best_age_min is None or age_min < best_age_min):
-            best = sched
-            best_age_min = age_min
-    return best or schedules[0]
+            row = cur.fetchone()
+    return _progress_collection_payload(dict(row)) if row else None
 
 
 def update_standup_schedule(team_id: str, schedule_id: int, **kwargs) -> dict | None:
-    """Update a standup schedule by id (scoped to team_id)."""
+    """Compatibility wrapper for progress collection tasks."""
     allowed = {
         "name",
         "channel_id",
@@ -881,57 +1214,28 @@ def update_standup_schedule(team_id: str, schedule_id: int, **kwargs) -> dict | 
         "participants",
         "reminder_minutes",
         "active",
-        "post_to_thread",
-        "notify_on_report",
-        "weekend_reminder",
-        "report_channel",
-        "report_time",
-        "sync_with_channel",
-        "group_by",
-        "prepopulate_answers",
-        "allow_edit_after_report",
-        "post_summary",
-        "ai_summary_enabled",
-        "ai_provider",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return get_standup_schedule(team_id, schedule_id)
-    if "questions" in fields and isinstance(fields["questions"], list):
-        fields["questions"] = json.dumps(fields["questions"])
-    set_clause = ", ".join(f"{k} = %s" for k in fields) + ", updated_at = NOW()"
-    sql = f"UPDATE standup_schedules SET {set_clause} WHERE id = %s AND team_id = %s RETURNING *"
-    with db_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, list(fields.values()) + [schedule_id, team_id])
-            row = cur.fetchone()
-    return dict(row) if row else None
+    return update_progress_collection(team_id, schedule_id, **fields)
 
 
 def delete_standup_schedule(team_id: str, schedule_id: int) -> bool:
-    """Hard-delete a standup schedule (scoped to team_id)."""
-    sql = "DELETE FROM standup_schedules WHERE id = %s AND team_id = %s"
-    with db_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (schedule_id, team_id))
-            return cur.rowcount > 0
+    """Compatibility wrapper for progress collection tasks."""
+    return delete_progress_collection(team_id, schedule_id)
 
 
 def get_standup_schedule(team_id: str, schedule_id: int) -> dict | None:
-    """Return a single standup schedule by id (scoped to team_id)."""
-    sql = "SELECT * FROM standup_schedules WHERE id = %s AND team_id = %s"
-    with db_conn() as conn:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(sql, (schedule_id, team_id))
-            row = cur.fetchone()
-    return dict(row) if row else None
+    """Compatibility wrapper for progress collection tasks."""
+    return get_progress_collection(team_id, schedule_id)
 
 
 def get_all_active_schedules() -> list[dict]:
-    """Return all active schedules across all workspaces (for scheduler bootstrap)."""
+    """Return all active progress collection tasks across all workspaces."""
     sql = """
         SELECT s.*, i.bot_token
-        FROM standup_schedules s
+        FROM progress_collections s
         JOIN installations i ON i.team_id = s.team_id
         WHERE s.active = TRUE
     """

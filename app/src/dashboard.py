@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import secrets
+import zipfile
 from functools import wraps
 from urllib.parse import urlparse
 
@@ -74,7 +75,7 @@ _SETTING_DEFAULTS = {
     "FEISHU_EVENT_MODE": "ws",
     "FEISHU_TEAM_ID": "feishu",
     "FEISHU_TEAM_NAME": "飞书工作区",
-    "FEISHU_DEFAULT_CHAT_NAME": "站会",
+    "FEISHU_DEFAULT_CHAT_NAME": "进度群",
     "FEISHU_SCHEDULE_TIME": "09:30",
     "FEISHU_SCHEDULE_TZ": "Asia/Shanghai",
     "FEISHU_SCHEDULE_DAYS": "mon,tue,wed,thu,fri",
@@ -90,6 +91,9 @@ _FEISHU_TRANSPORT_KEYS = {
     "FEISHU_APP_SECRET",
     "FEISHU_VERIFICATION_TOKEN",
 }
+
+_SKILLS_PACKAGE_VERSION = "0.1.0"
+_SKILLS_PACKAGE_FILENAME = f"chenxu-skills-{_SKILLS_PACKAGE_VERSION}.zip"
 
 
 def _is_placeholder_feishu_chat_id(chat_id: str | None) -> bool:
@@ -194,6 +198,52 @@ def _normalise_member_tags(raw_tags) -> list[str]:
         seen.add(folded)
         deduped.append(value)
     return deduped[:12]
+
+
+def _json_safe(value):
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    return value
+
+
+def _progress_collection_request(data: dict) -> dict:
+    days = data.get("schedule_days", ["mon", "tue", "wed", "thu", "fri"])
+    return {
+        "name": data.get("name") or "每日进度收集",
+        "channel_id": data.get("channel_id") or "",
+        "schedule_time": data.get("schedule_time") or "09:30",
+        "schedule_tz": data.get("schedule_tz") or "Asia/Shanghai",
+        "schedule_days": days,
+        "questions": data.get(
+            "questions",
+            ["请按“项目 + 已完成/正在做 + 下一步 + 风险阻塞”的格式提交进度。"],
+        ),
+        "participants": data.get("participants") or [],
+        "reminder_minutes": int(data.get("reminder_minutes") or 0),
+        "active": bool(data.get("active", True)),
+    }
+
+
+def _publish_job_request(data: dict) -> dict:
+    return {
+        "name": data.get("name") or "定时发布",
+        "destination_type": data.get("destination_type") or "feishu_channel",
+        "destination": data.get("destination") or "",
+        "schedule_time": data.get("schedule_time") or "18:00",
+        "schedule_tz": data.get("schedule_tz") or "Asia/Shanghai",
+        "schedule_days": data.get("schedule_days") or ["mon", "tue", "wed", "thu", "fri"],
+        "range_days": int(data.get("range_days") or 1),
+        "member_ids": data.get("member_ids") or [],
+        "project_ids": data.get("project_ids") or [],
+        "ai_summary_enabled": bool(data.get("ai_summary_enabled", True)),
+        "ai_provider": data.get("ai_provider") or "deepseek",
+        "ai_prompt": data.get("ai_prompt") or "",
+        "active": bool(data.get("active", True)),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -665,6 +715,303 @@ def api_update_settings():
         return jsonify(_read_app_settings_payload())
     except Exception as exc:
         logger.error("api_update_settings error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/skills-package", methods=["GET"])
+@_login_required
+def api_skills_package():
+    return jsonify(
+        {
+            "version": _SKILLS_PACKAGE_VERSION,
+            "filename": _SKILLS_PACKAGE_FILENAME,
+            "download_url": url_for("dashboard.api_download_skills_package"),
+        }
+    )
+
+
+@dashboard_bp.route("/dashboard/api/skills-package/download", methods=["GET"])
+@_login_required
+def api_download_skills_package():
+    manifest = {
+        "name": "chenxu-progress",
+        "version": _SKILLS_PACKAGE_VERSION,
+        "description": "通过晨序控制台读取团队进度和数据看板。",
+        "mcp_server": "/mcp",
+    }
+    skill_md = f"""# 晨序进度 Skill
+
+版本：{_SKILLS_PACKAGE_VERSION}
+
+这个包用于连接晨序控制台的 MCP 接口，让 AI 助手读取团队进度、成员和看板数据。
+
+## 配置
+
+1. 在晨序控制台配置飞书和 AI。
+2. 使用控制台地址作为服务地址。
+3. 使用管理员提供的访问凭证连接 MCP 服务。
+
+## 能力
+
+- 查询指定日期或时间范围内的进度记录。
+- 查看项目、成员和数据看板汇总。
+- 读取已确认入库的规范化进度内容。
+"""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("chenxu-progress/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        archive.writestr("chenxu-progress/SKILL.md", skill_md)
+    buffer.seek(0)
+    return Response(
+        buffer.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={_SKILLS_PACKAGE_FILENAME}"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Progress product API
+# ---------------------------------------------------------------------------
+
+
+@dashboard_bp.route("/dashboard/api/data-board", methods=["GET"])
+@_login_required
+def api_data_board():
+    team_id = session["team_id"]
+    days = int(request.args.get("days", 7))
+    try:
+        return jsonify(_json_safe(db.get_data_board(team_id, days)))
+    except Exception as exc:
+        logger.error("api_data_board error: %s", exc)
+        return jsonify(
+            {
+                "total_entries": 0,
+                "active_members": 0,
+                "active_projects": 0,
+                "updated_today": 0,
+                "by_project": [],
+                "by_member": [],
+                "by_date": [],
+                "recent_entries": [],
+            }
+        )
+
+
+@dashboard_bp.route("/dashboard/api/collections", methods=["GET"])
+@_login_required
+def api_list_collections():
+    team_id = session["team_id"]
+    try:
+        return jsonify(_json_safe(db.get_progress_collections(team_id)))
+    except Exception as exc:
+        logger.error("api_list_collections error: %s", exc)
+        return jsonify([])
+
+
+@dashboard_bp.route("/dashboard/api/collections", methods=["POST"])
+@_login_required
+def api_create_collection():
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    try:
+        row = db.create_progress_collection(team_id, **_progress_collection_request(data))
+        _refresh_schedule_job(team_id, {"team_id": team_id, **row})
+        return jsonify(_json_safe(row)), 201
+    except Exception as exc:
+        logger.error("api_create_collection error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/collections/<int:collection_id>", methods=["PUT"])
+@_login_required
+def api_update_collection(collection_id: int):
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    try:
+        row = db.update_progress_collection(team_id, collection_id, **_progress_collection_request(data))
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        _refresh_schedule_job(team_id, {"team_id": team_id, **row})
+        return jsonify(_json_safe(row))
+    except Exception as exc:
+        logger.error("api_update_collection error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/collections/<int:collection_id>", methods=["DELETE"])
+@_login_required
+def api_delete_collection(collection_id: int):
+    team_id = session["team_id"]
+    try:
+        db.delete_progress_collection(team_id, collection_id)
+        _remove_schedule_jobs(team_id, collection_id)
+        return jsonify({"ok": True})
+    except Exception as exc:
+        logger.error("api_delete_collection error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/projects", methods=["GET"])
+@_login_required
+def api_list_projects():
+    team_id = session["team_id"]
+    try:
+        return jsonify(_json_safe(db.get_projects(team_id)))
+    except Exception as exc:
+        logger.error("api_list_projects error: %s", exc)
+        return jsonify([])
+
+
+@dashboard_bp.route("/dashboard/api/projects", methods=["POST"])
+@_login_required
+def api_create_project():
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "项目名称不能为空"}), 400
+    try:
+        return jsonify(_json_safe(db.upsert_project(team_id, name, data.get("description", ""), data.get("status", "active")))), 201
+    except Exception as exc:
+        logger.error("api_create_project error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/projects/<int:project_id>", methods=["PUT"])
+@_login_required
+def api_update_project(project_id: int):
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "项目名称不能为空"}), 400
+    try:
+        row = db.update_project(team_id, project_id, name, data.get("description", ""), data.get("status", "active"))
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(_json_safe(row))
+    except Exception as exc:
+        logger.error("api_update_project error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/progress", methods=["GET"])
+@_login_required
+def api_list_progress():
+    team_id = session["team_id"]
+    try:
+        rows = db.get_progress_entries(
+            team_id,
+            from_date=request.args.get("date_from") or None,
+            to_date=request.args.get("date_to") or None,
+            user_id=request.args.get("user_id") or None,
+            project_id=int(request.args["project_id"]) if request.args.get("project_id") else None,
+        )
+        return jsonify(_json_safe(rows))
+    except Exception as exc:
+        logger.error("api_list_progress error: %s", exc)
+        return jsonify([])
+
+
+@dashboard_bp.route("/dashboard/api/progress", methods=["POST"])
+@_login_required
+def api_create_progress():
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    user_id = data.get("user_id") or session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "成员不能为空"}), 400
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify({"error": "进度内容不能为空"}), 400
+    try:
+        entry_id = db.save_progress_entry(
+            team_id=team_id,
+            user_id=user_id,
+            project_id=data.get("project_id"),
+            role=data.get("role") or "",
+            content=content,
+            source="dashboard",
+        )
+        return jsonify(_json_safe(db.get_progress_entry(team_id, int(entry_id)))), 201
+    except Exception as exc:
+        logger.error("api_create_progress error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/progress/<int:entry_id>", methods=["PUT"])
+@_login_required
+def api_update_progress(entry_id: int):
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    try:
+        row = db.update_progress_entry(team_id, entry_id, created_by=session.get("user_id", ""), **data)
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(_json_safe(row))
+    except Exception as exc:
+        logger.error("api_update_progress error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/progress/<int:entry_id>/snapshots", methods=["GET"])
+@_login_required
+def api_progress_snapshots(entry_id: int):
+    team_id = session["team_id"]
+    try:
+        return jsonify(_json_safe(db.get_progress_snapshots(team_id, entry_id)))
+    except Exception as exc:
+        logger.error("api_progress_snapshots error: %s", exc)
+        return jsonify([])
+
+
+@dashboard_bp.route("/dashboard/api/publish-jobs", methods=["GET"])
+@_login_required
+def api_list_publish_jobs():
+    team_id = session["team_id"]
+    try:
+        return jsonify(_json_safe(db.get_publish_jobs(team_id)))
+    except Exception as exc:
+        logger.error("api_list_publish_jobs error: %s", exc)
+        return jsonify([])
+
+
+@dashboard_bp.route("/dashboard/api/publish-jobs", methods=["POST"])
+@_login_required
+def api_create_publish_job():
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    try:
+        return jsonify(_json_safe(db.create_publish_job(team_id, **_publish_job_request(data)))), 201
+    except Exception as exc:
+        logger.error("api_create_publish_job error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/publish-jobs/<int:job_id>", methods=["PUT"])
+@_login_required
+def api_update_publish_job(job_id: int):
+    team_id = session["team_id"]
+    data = request.get_json(force=True) or {}
+    try:
+        row = db.update_publish_job(team_id, job_id, **_publish_job_request(data))
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify(_json_safe(row))
+    except Exception as exc:
+        logger.error("api_update_publish_job error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@dashboard_bp.route("/dashboard/api/publish-jobs/<int:job_id>", methods=["DELETE"])
+@_login_required
+def api_delete_publish_job(job_id: int):
+    team_id = session["team_id"]
+    try:
+        db.delete_publish_job(team_id, job_id)
+        return jsonify({"ok": True})
+    except Exception as exc:
+        logger.error("api_delete_publish_job error: %s", exc)
         return jsonify({"error": str(exc)}), 500
 
 
@@ -1154,41 +1501,39 @@ def api_export_csv():
     from_date = request.args.get("from")
     to_date = request.args.get("to")
     try:
-        rows = db.export_standups(team_id, from_date, to_date)
+        rows = db.get_progress_entries(team_id, from_date=from_date, to_date=to_date)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     output = io.StringIO()
     writer = csv.DictWriter(
         output,
         fieldnames=[
-            "standup_date",
+            "progress_date",
             "user_id",
-            "yesterday",
-            "today",
-            "blockers",
-            "has_blockers",
+            "member_name",
+            "project_name",
+            "role",
+            "content",
             "submitted_at",
-            "mood",
         ],
     )
     writer.writeheader()
     for row in rows:
         writer.writerow(
             {
-                "standup_date": row.get("standup_date", ""),
+                "progress_date": row.get("progress_date", ""),
                 "user_id": row.get("user_id", ""),
-                "yesterday": row.get("yesterday", ""),
-                "today": row.get("today", ""),
-                "blockers": row.get("blockers", ""),
-                "has_blockers": row.get("has_blockers", ""),
+                "member_name": row.get("member_name", ""),
+                "project_name": row.get("project_name", ""),
+                "role": row.get("role", ""),
+                "content": row.get("content", ""),
                 "submitted_at": row.get("submitted_at", ""),
-                "mood": row.get("mood", ""),
             }
         )
     return Response(
         output.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=standups-{team_id}.csv"},
+        headers={"Content-Disposition": f"attachment; filename=progress-{team_id}.csv"},
     )
 
 
@@ -1386,9 +1731,9 @@ def public_feed(token: str):
     if not config or not config.get("feed_public"):
         return "<h2>Feed not found or not public.</h2>", 404
     team_id = config["team_id"]
-    standups = db.get_standups(team_id, days=1)
+    entries = db.get_progress_entries(team_id, days=1)
     today = date.today().strftime("%A, %B %-d, %Y")
-    return render_template("feed.html", standups=standups, config=config, today=today)
+    return render_template("feed.html", entries=entries, config=config, today=today)
 
 
 @dashboard_bp.route("/dashboard/api/feed-token", methods=["POST"])

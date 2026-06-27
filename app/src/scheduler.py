@@ -1,4 +1,4 @@
-"""Scheduler — per-workspace standup cron jobs backed by PostgreSQL config."""
+"""Scheduler — progress collection and publishing cron jobs backed by PostgreSQL."""
 
 from __future__ import annotations
 
@@ -318,9 +318,7 @@ def _send_feishu_standup_to_workspace(
 ) -> None:
     adapter = _get_feishu_adapter()
     default_questions = questions or [
-        "昨天完成了什么？",
-        "今天计划做什么？",
-        "有什么阻塞？没有就回复“无”。",
+        "请按“项目 + 已完成/正在做 + 下一步 + 风险阻塞”的格式提交进度。",
     ]
     failed_count = 0
     dm_count = 0
@@ -348,10 +346,10 @@ def _send_feishu_standup_to_workspace(
                 channel_id,
                 team_id=team_id,
                 questions=default_questions,
-                standup_name=standup_name,
-                schedule_id=schedule_id,
+                collection_name=standup_name,
+                collection_id=schedule_id,
             )
-            logger.info("Sent Feishu standup DM to %s / %s", team_id, user_id)
+            logger.info("Sent Feishu progress DM to %s / %s", team_id, user_id)
         except Exception as exc:
             failed_count += 1
             logger.error("Failed to send Feishu DM to %s / %s: %s", team_id, user_id, exc)
@@ -361,7 +359,7 @@ def _send_feishu_standup_to_workspace(
 
 
 def _send_standup_to_workspace(team_id: str, bot_token: str, channel_id: str, schedule_id: int | None = None) -> None:
-    """DM participants of a standup schedule (or all active members if no schedule)."""
+    """DM participants of a progress collection task."""
     bot_token = _fresh_bot_token(team_id, bot_token)
     try:
         import db  # noqa: PLC0415
@@ -382,7 +380,7 @@ def _send_standup_to_workspace(team_id: str, bot_token: str, channel_id: str, sc
             questions = questions_raw if questions_raw else None
             participants_filter = schedule.get("participants") or []
             channel_id = schedule.get("channel_id") or channel_id
-            standup_name = schedule.get("name", "Team Standup")
+            standup_name = schedule.get("name", "进度收集")
         else:
             config = db.get_workspace_config(team_id) or {}
             qs = config.get("questions") or []
@@ -395,16 +393,16 @@ def _send_standup_to_workspace(team_id: str, bot_token: str, channel_id: str, sc
                     qs = []
             questions = qs if qs else None
             participants_filter = []
-            standup_name = config.get("standup_name", "Team Standup")
+            standup_name = config.get("collection_name", "进度收集")
 
         members = db.get_active_members(team_id)
         if participants_filter:
             members = [m for m in members if m["user_id"] in participants_filter]
     except Exception as exc:
-        logger.error("Could not load data for standup %s/%s: %s", team_id, schedule_id, exc)
+        logger.error("Could not load data for progress collection %s/%s: %s", team_id, schedule_id, exc)
         return
 
-    logger.info("Triggering standup for team %s (%d members)", team_id, len(members))
+    logger.info("Triggering progress collection for team %s (%d members)", team_id, len(members))
 
     if _is_feishu_workspace(team_id, bot_token):
         _send_feishu_standup_to_workspace(team_id, channel_id, schedule_id, members, questions, standup_name)
@@ -872,6 +870,95 @@ def _post_scheduled_report(team_id: str, bot_token: str, channel_id: str, schedu
         logger.error("Scheduled report failed for %s: %s", team_id, exc)
 
 
+def _run_publish_job(team_id: str, job_id: int) -> None:
+    """Publish a database-backed progress snapshot to Feishu or webhook."""
+    try:
+        import db  # noqa: PLC0415
+
+        job = next((item for item in db.get_publish_jobs(team_id) if int(item["id"]) == int(job_id)), None)
+        if not job or not job.get("active", True):
+            return
+
+        entries = db.get_progress_entries(team_id, days=int(job.get("range_days") or 1))
+        member_ids = set(job.get("member_ids") or [])
+        project_ids = {int(pid) for pid in (job.get("project_ids") or [])}
+        if member_ids:
+            entries = [entry for entry in entries if entry.get("user_id") in member_ids]
+        if project_ids:
+            entries = [entry for entry in entries if entry.get("project_id") in project_ids]
+        if not entries:
+            logger.info("Publish job %s/%s has no progress entries", team_id, job_id)
+            return
+
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        lines = [f"进度快照 - {date_str}"]
+        if job.get("ai_summary_enabled"):
+            ai_text = _generate_publish_ai_summary(entries, job)
+            if ai_text:
+                lines.extend(["", ai_text])
+        for entry in entries:
+            member = entry.get("member_name") or entry.get("user_id")
+            project = entry.get("project_name") or "未归属项目"
+            text = entry.get("content") or ""
+            lines.extend(["", f"{project}｜{member}", text])
+        text = "\n".join(lines)
+
+        destination_type = job.get("destination_type") or "feishu_channel"
+        destination = job.get("destination") or ""
+        if destination_type == "feishu_channel":
+            _get_feishu_adapter().post_to_channel(destination, text)
+        elif destination_type == "webhook":
+            import requests  # noqa: PLC0415
+
+            requests.post(destination, json={"event": "progress.snapshot", "team_id": team_id, "text": text}, timeout=10)
+        logger.info("Published progress snapshot for %s/%s", team_id, job_id)
+    except Exception as exc:
+        logger.error("Progress publish job failed for %s/%s: %s", team_id, job_id, exc)
+
+
+def _generate_publish_ai_summary(entries: list[dict], job: dict) -> str:
+    provider = job.get("ai_provider") or get_setting("FEISHU_AI_PROVIDER", "deepseek")
+    standup_like_rows = [
+        {
+            "user_id": entry.get("member_name") or entry.get("user_id"),
+            "yesterday": entry.get("content") or "",
+            "today": "",
+            "blockers": "",
+        }
+        for entry in entries
+    ]
+    try:
+        from ai_summary import generate_summary  # noqa: PLC0415
+
+        return generate_summary(standup_like_rows, provider=provider)
+    except Exception as exc:
+        logger.warning("Publish AI summary failed: %s", exc)
+        return ""
+
+
+def register_publish_job(scheduler: BackgroundScheduler, job: dict) -> None:
+    team_id = job["team_id"]
+    schedule_time = job.get("schedule_time", "18:00")
+    schedule_tz = job.get("schedule_tz", "Asia/Shanghai")
+    schedule_days = job.get("schedule_days", "mon,tue,wed,thu,fri")
+    if isinstance(schedule_days, list):
+        schedule_days = ",".join(schedule_days)
+    try:
+        hour, minute = schedule_time.split(":")
+        tz = pytz.timezone(schedule_tz)
+    except Exception as exc:
+        logger.error("Invalid publish job config %s: %s", job.get("id"), exc)
+        return
+    scheduler.add_job(
+        _run_publish_job,
+        trigger=CronTrigger(hour=int(hour), minute=int(minute), day_of_week=schedule_days, timezone=tz),
+        args=[team_id, int(job["id"])],
+        id=f"publish_{team_id}_{job['id']}",
+        name=f"{job.get('name', '定时发布')} — {team_id}",
+        replace_existing=True,
+    )
+
+
 def register_workspace_job(
     scheduler: BackgroundScheduler,
     team_id: str,
@@ -902,12 +989,12 @@ def register_workspace_job(
         _send_standup_to_workspace,
         trigger=trigger,
         args=[team_id, bot_token, channel_id],
-        id=f"standup_{team_id}",
-        name=f"Standup — {team_id}",
+        id=f"progress_collection_{team_id}",
+        name=f"Progress collection — {team_id}",
         replace_existing=True,
     )
     logger.info(
-        "Registered standup job for %s at %s %s (%s)",
+        "Registered progress collection job for %s at %s %s (%s)",
         team_id,
         schedule_time,
         schedule_tz,
@@ -965,26 +1052,6 @@ def register_workspace_job(
         replace_existing=True,
     )
 
-    # Scheduled report job — posts summary at report_time regardless of completion
-    report_time = config.get("report_time") or schedule_time
-    try:
-        r_hour, r_minute = report_time.split(":")
-    except Exception:
-        r_hour, r_minute = hour, minute
-    scheduler.add_job(
-        _post_scheduled_report,
-        trigger=CronTrigger(
-            hour=int(r_hour),
-            minute=int(r_minute),
-            day_of_week=schedule_days,
-            timezone=tz,
-        ),
-        args=[team_id, bot_token, channel_id],
-        id=f"report_{team_id}",
-        name=f"Report — {team_id}",
-        replace_existing=True,
-    )
-    logger.info("Registered report job for %s at %s %s", team_id, report_time, schedule_tz)
 
 
 def register_workspace_digests_only(
@@ -1036,13 +1103,15 @@ def register_workspace_digests_only(
 
 
 def register_schedule_job(scheduler: BackgroundScheduler, schedule: dict) -> None:
-    """Register a cron job for a standup_schedules row."""
+    """Register a cron job for a progress collection row."""
     team_id = schedule["team_id"]
     bot_token = schedule["bot_token"]
     schedule_id = schedule["id"]
     schedule_time = schedule.get("schedule_time", "09:00")
     schedule_tz = schedule.get("schedule_tz", "UTC")
     schedule_days = schedule.get("schedule_days", "mon,tue,wed,thu,fri")
+    if isinstance(schedule_days, list):
+        schedule_days = ",".join(schedule_days)
     channel_id = schedule.get("channel_id") or ""
     reminder_minutes = int(schedule.get("reminder_minutes") or 0)
 
@@ -1060,7 +1129,7 @@ def register_schedule_job(scheduler: BackgroundScheduler, schedule: dict) -> Non
         trigger=trigger,
         args=[team_id, bot_token, channel_id, schedule_id],
         id=job_id,
-        name=f"{schedule.get('name', 'Standup')} — {team_id}",
+        name=f"{schedule.get('name', '进度收集')} — {team_id}",
         replace_existing=True,
     )
     logger.info(
@@ -1091,33 +1160,14 @@ def register_schedule_job(scheduler: BackgroundScheduler, schedule: dict) -> Non
             trigger=CronTrigger(hour=int(hour), minute=int(minute), day_of_week="fri", timezone=tz),
             args=[team_id, bot_token, reminder_minutes if reminder_minutes > 0 else 0],
             id=f"weekend_reminder_schedule_{team_id}_{schedule_id}",
-            name=f"Weekend Reminder — {schedule.get('name', 'Standup')} — {team_id}",
+            name=f"Weekend reminder — {schedule.get('name', '进度收集')} — {team_id}",
             replace_existing=True,
         )
         logger.info(
             "Registered weekend reminder job %s (%s) on Fridays at %s", schedule_id, schedule.get("name"), schedule_time
         )
 
-    # Scheduled report job — posts summary at report_time regardless of completion
-    report_time = schedule.get("report_time") or schedule_time
-    try:
-        r_hour, r_minute = report_time.split(":")
-    except Exception:
-        r_hour, r_minute = hour, minute
-    scheduler.add_job(
-        _post_scheduled_report,
-        trigger=CronTrigger(
-            hour=int(r_hour),
-            minute=int(r_minute),
-            day_of_week=schedule_days,
-            timezone=tz,
-        ),
-        args=[team_id, bot_token, channel_id, schedule_id],
-        id=f"report_schedule_{team_id}_{schedule_id}",
-        name=f"Report — {schedule.get('name', 'Standup')} — {team_id}",
-        replace_existing=True,
-    )
-    logger.info("Registered report job for schedule %s at %s %s", schedule_id, report_time, schedule_tz)
+    logger.info("Registered progress collection job for task %s at %s %s", schedule_id, schedule_time, schedule_tz)
 
 
 def build_scheduler(installations: list[tuple[str, str, dict]]) -> BackgroundScheduler:
@@ -1135,8 +1185,12 @@ def build_scheduler(installations: list[tuple[str, str, dict]]) -> BackgroundSch
         for sched in all_schedules:
             teams_with_schedules.add(sched["team_id"])
             register_schedule_job(scheduler, sched)
+        for team_id, _, _ in installations:
+            for job in db.get_publish_jobs(team_id):
+                if job.get("active", True):
+                    register_publish_job(scheduler, job)
     except Exception as exc:
-        logger.warning("Could not load standup_schedules: %s", exc)
+        logger.warning("Could not load progress scheduler jobs: %s", exc)
 
     for team_id, bot_token, config in installations:
         if team_id in teams_with_schedules:

@@ -1,4 +1,4 @@
-"""Feishu event callback handler and shared message-processing logic."""
+"""Feishu event callback handler and shared progress collection logic."""
 
 from __future__ import annotations
 
@@ -15,11 +15,8 @@ from state import state_store
 logger = logging.getLogger(__name__)
 feishu_bp = Blueprint("feishu", __name__)
 
-_MOOD_QUESTION = "🎭 今天状态怎么样？（很好 / 正常 / 有点累，或直接写任何内容）"
 _DEFAULT_QUESTIONS = [
-    "昨天完成了什么？",
-    "今天计划做什么？",
-    "有什么阻塞？没有就回复“无”。",
+    "请按“项目 + 已完成/正在做 + 下一步 + 风险阻塞”的格式提交进度。",
 ]
 
 
@@ -104,8 +101,8 @@ def handle_feishu_text_message(*, user_id: str, text: str, chat_id: str = "", ch
 
     _upsert_feishu_member(adapter, team_id, user_id)
 
-    if normalized in {"standup", "/standup", "开始", "开始站会", "站会"}:
-        _start_feishu_standup(adapter, team_id, user_id, fallback_channel=chat_id)
+    if normalized in {"progress", "/progress", "开始", "开始进度", "进度"}:
+        _start_progress_collection(adapter, team_id, user_id, fallback_channel=chat_id)
         return
 
     if normalized in {"skip", "/skip", "跳过", "请假"}:
@@ -114,7 +111,7 @@ def handle_feishu_text_message(*, user_id: str, text: str, chat_id: str = "", ch
         return
 
     if normalized in {"help", "/help", "帮助"}:
-        adapter.send_dm(user_id, "回复“站会”开始填写；回复“跳过”跳过今天。")
+        adapter.send_dm(user_id, "回复“进度”开始填写；回复“跳过”跳过今天。")
         return
 
     session = state_store.get(cache_key)
@@ -137,21 +134,32 @@ def handle_feishu_text_message(*, user_id: str, text: str, chat_id: str = "", ch
     if not session.response_chat_id and chat_id:
         session = state_store.bind_response_chat(cache_key, chat_id) or session
 
+    if session.phase in {"confirming", "needs_revision"}:
+        if normalized in {"确认", "ok", "okay", "yes", "y"}:
+            if session.phase == "confirming" and (session.pending_progress or {}).get("valid"):
+                _save_confirmed_progress(adapter, user_id, session)
+            else:
+                adapter.send_dm(user_id, "当前进度还没有通过格式校验，请先补充项目和进度内容。")
+            return
+        session = state_store.record_feedback(cache_key, text) or session
+        _normalize_and_request_confirmation(adapter, user_id, session, feedback=text)
+        return
+
     session = state_store.record_answer(cache_key, text)
     if session is None:
-        adapter.send_dm(user_id, "会话已失效，请回复“站会”重新开始。")
+        adapter.send_dm(user_id, "会话已失效，请回复“进度”重新开始。")
         return
 
     n_questions = len(session.questions)
     if session.step < n_questions:
-        adapter.send_dm(user_id, session.questions[session.step])
-    elif session.step == n_questions:
-        adapter.send_dm(user_id, _MOOD_QUESTION)
+        question = session.questions[session.step]
+        adapter.send_dm(user_id, question)
+        state_store.record_assistant_message(cache_key, question)
     else:
-        _complete_feishu_standup(adapter, user_id, session)
+        _normalize_and_request_confirmation(adapter, user_id, session)
 
 
-def _start_feishu_standup(
+def _start_progress_collection(
     adapter: FeishuAdapter,
     team_id: str,
     user_id: str,
@@ -165,19 +173,19 @@ def _start_feishu_standup(
 
     channel_id = fallback_channel
     questions: list[str] | None = None
-    standup_name = "团队站会"
-    resolved_schedule_id = schedule_id
+    collection_name = "进度收集"
+    resolved_collection_id = schedule_id
 
     sched = None
     if schedule_id is not None:
-        sched = db.get_standup_schedule(team_id, schedule_id)
+        sched = db.get_progress_collection(team_id, schedule_id)
     if sched is None:
-        sched = db.get_schedule_for_user(team_id, user_id)
+        sched = db.get_progress_collection_for_user(team_id, user_id)
     if sched:
         channel_id = sched.get("channel_id") or channel_id
         questions = _questions_from_config(sched.get("questions"))
-        standup_name = sched.get("name") or standup_name
-        resolved_schedule_id = sched.get("id")
+        collection_name = sched.get("name") or collection_name
+        resolved_collection_id = sched.get("id")
     else:
         config = db.get_workspace_config(team_id) or {}
         channel_id = config.get("channel_id") or channel_id
@@ -189,29 +197,99 @@ def _start_feishu_standup(
         channel_id,
         team_id=team_id,
         questions=active_questions,
-        standup_name=standup_name,
-        schedule_id=resolved_schedule_id,
+        collection_name=collection_name,
+        collection_id=resolved_collection_id,
     )
-    adapter.send_dm(user_id, f"{standup_name}\n\n{active_questions[0]}")
+    message = f"{collection_name}\n\n{active_questions[0]}"
+    adapter.send_dm(user_id, message)
+    state_store.record_assistant_message(cache_key, message)
 
 
-def _complete_feishu_standup(adapter: FeishuAdapter, user_id: str, session) -> None:
-    n_questions = len(session.questions)
-    answers = session.answers[:n_questions]
-    mood = session.answers[n_questions] if len(session.answers) > n_questions else None
+def _normalize_and_request_confirmation(
+    adapter: FeishuAdapter,
+    user_id: str,
+    session,
+    *,
+    feedback: str = "",
+) -> None:
+    answers = list(session.answers)
+    member = _member_payload(session.team_id, user_id)
+    projects = db.get_projects(session.team_id)
+    previous = db.get_previous_progress_entry(session.team_id, user_id)
 
-    db.save_standup(
+    from ai_progress import normalize_progress  # noqa: PLC0415
+
+    pending = normalize_progress(
+        raw_answers=answers,
+        conversation=session.messages,
+        projects=projects,
+        member=member,
+        previous_entry=previous,
+        feedback=feedback,
+    )
+
+    if not pending.get("valid"):
+        state_store.clear_pending_progress(f"{session.team_id}:{user_id}")
+        errors = "；".join(pending.get("validation_errors") or ["进度格式不完整"])
+        message = f"这版进度还不能入库：{errors}。请补充项目和进度内容，我会重新整理。"
+        adapter.send_dm(user_id, message)
+        state_store.record_assistant_message(f"{session.team_id}:{user_id}", message)
+        return
+
+    state_store.set_pending_progress(f"{session.team_id}:{user_id}", pending)
+    message = _format_progress_confirmation(pending)
+    adapter.send_dm(user_id, message)
+    state_store.record_assistant_message(f"{session.team_id}:{user_id}", message)
+
+
+def _format_progress_confirmation(pending: dict) -> str:
+    project_name = (pending.get("project_name") or "未归属项目").strip()
+    role = (pending.get("role") or "未填写").strip()
+    content = (pending.get("content") or "").strip()
+    return (
+        "我整理成下面这版进度，请检查项目、岗位和内容。\n"
+        "确认无误请回复“确认”；如果不准确，直接继续补充。\n\n"
+        f"项目：{project_name}\n"
+        f"岗位：{role}\n"
+        f"进度：\n{content}"
+    )
+
+
+def _save_confirmed_progress(adapter: FeishuAdapter, user_id: str, session) -> None:
+    pending = session.pending_progress or {}
+    project_id = pending.get("project_id")
+    if project_id is None:
+        project_id = _resolve_project_id(session.team_id, pending.get("project_name", ""))
+
+    db.save_progress_entry(
         team_id=session.team_id,
+        collection_id=session.collection_id,
         user_id=user_id,
-        yesterday=answers[0] if len(answers) > 0 else "",
-        today=answers[1] if len(answers) > 1 else "",
-        blockers=answers[2] if len(answers) > 2 else "",
-        mood=mood,
+        project_id=project_id,
+        role=pending.get("role", ""),
+        content=pending.get("content", ""),
     )
     _upsert_feishu_member(adapter, session.team_id, user_id)
-    confirmation = "已提交。将在汇总时间统一发到群里。" if session.channel else "已提交。"
+    confirmation = "已保存。"
     adapter.send_dm(user_id, confirmation)
     state_store.clear(f"{session.team_id}:{user_id}")
+
+
+def _member_payload(team_id: str, user_id: str) -> dict:
+    for member in db.get_active_members(team_id):
+        if member.get("user_id") == user_id:
+            return member
+    return {"user_id": user_id}
+
+
+def _resolve_project_id(team_id: str, project_name: str) -> int | None:
+    name = (project_name or "").strip()
+    if not name or name == "未归属项目":
+        return None
+    for project in db.get_projects(team_id):
+        if (project.get("name") or "").strip() == name:
+            return int(project["id"])
+    return None
 
 
 def _questions_from_config(raw) -> list[str] | None:
