@@ -324,6 +324,23 @@ class TestApiReports:
         data = resp.get_json()
         assert all(s["user_id"] == "U1" for s in data["standups"])
 
+    def test_excludes_dashboard_system_admin(self, authed_client):
+        _db_mock.get_standups.return_value = [
+            {"user_id": "admin", "yesterday": "internal", "today": "internal"},
+            {"user_id": "ou_1", "yesterday": "a", "today": "b"},
+        ]
+        _db_mock.get_participation_stats.return_value = [
+            {"user_id": "admin", "real_name": "admin", "responses": 0},
+            {"user_id": "ou_1", "real_name": "张三", "responses": 1},
+        ]
+
+        resp = authed_client.get("/dashboard/api/reports")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert [s["user_id"] for s in data["standups"]] == ["ou_1"]
+        assert [p["user_id"] for p in data["participation"]] == ["ou_1"]
+
     def test_db_error_returns_empty_fallback(self, authed_client):
         _db_mock.get_standups.side_effect = Exception("DB error")
         resp = authed_client.get("/dashboard/api/reports")
@@ -337,6 +354,17 @@ class TestApiReports:
         _db_mock.get_participation_stats.return_value = []
         resp = authed_client.get("/dashboard/api/reports?date_from=2024-01-01")
         assert resp.status_code == 200
+
+    def test_analytics_excludes_dashboard_system_admin(self, authed_client):
+        _db_mock.get_participation_stats.return_value = [
+            {"user_id": "admin", "real_name": "admin", "responses": 0, "days_with_blockers": 0},
+            {"user_id": "ou_1", "real_name": "张三", "responses": 1, "days_with_blockers": 0},
+        ]
+
+        resp = authed_client.get("/dashboard/api/analytics")
+
+        assert resp.status_code == 200
+        assert [row["user_id"] for row in resp.get_json()] == ["ou_1"]
 
 
 # ---------------------------------------------------------------------------

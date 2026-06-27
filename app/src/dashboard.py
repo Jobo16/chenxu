@@ -101,6 +101,14 @@ def _is_placeholder_feishu_member_id(user_id: str | None) -> bool:
     return (user_id or "").strip().lower() == "admin"
 
 
+def _is_dashboard_system_user_id(user_id: str | None) -> bool:
+    return _is_placeholder_feishu_member_id(user_id)
+
+
+def _without_dashboard_system_users(rows: list[dict]) -> list[dict]:
+    return [row for row in rows if not _is_dashboard_system_user_id(row.get("user_id"))]
+
+
 def _add_feishu_channel(channels: dict[str, dict], chat_id: str | None, name: str | None = None) -> None:
     if _is_placeholder_feishu_chat_id(chat_id):
         return
@@ -986,6 +994,7 @@ def api_reports():
             to_date=date_to or None,
             days=30,
         )
+        standups = _without_dashboard_system_users(standups)
         if user_id_filter:
             standups = [s for s in standups if s.get("user_id") == user_id_filter]
 
@@ -998,7 +1007,7 @@ def api_reports():
                 days = max(1, (_dt.utcnow() - d).days + 1)
             except Exception as e:
                 logger.warning("Unexpected error in api_reports parsing date_from: %s", e)
-        participation = db.get_participation_stats(team_id, days=days)
+        participation = _without_dashboard_system_users(db.get_participation_stats(team_id, days=days))
         total_days = days
 
         member_summary = []
@@ -1085,7 +1094,7 @@ def api_analytics():
     team_id = session["team_id"]
     days = int(request.args.get("days", 7))
     try:
-        stats = db.get_participation_stats(team_id, days)
+        stats = _without_dashboard_system_users(db.get_participation_stats(team_id, days))
         for row in stats:
             if row.get("last_standup"):
                 row["last_standup"] = row["last_standup"].isoformat()
